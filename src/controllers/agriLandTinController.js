@@ -190,6 +190,36 @@ function matrixToXlsx({ categories, map }, sheetName) {
   return XLSX.write(wb, { bookType: 'xlsx', type: 'buffer' });
 }
 
+// Yacheyka bosilganda — ikkala qiymatga ega TINlar ro'yxati
+// GET /tin-list?field=land_fund_category&a=006001&b=006003
+exports.tinList = async (req, res) => {
+  const { field = 'land_fund_category', a, b } = req.query;
+  if (!a || !b) return res.status(400).json({ message: 'a va b parametrlari kerak' });
+
+  const matchField = `category.${field}`;
+  const data = await AgriLandTin.find(
+    { [matchField]: a, ...(a !== b ? { [matchField]: { $all: [a, b] } } : { [matchField]: a }) },
+    { tin: 1 }
+  ).lean();
+
+  // a === b (diagonal) — faqat a ga ega TINlar
+  // a !== b — ikkalasiga ham ega TINlar
+  let tins;
+  if (a === b) {
+    tins = (await AgriLandTin.find(
+      { [matchField]: a },
+      { tin: 1 }
+    ).lean()).map(d => d.tin);
+  } else {
+    tins = (await AgriLandTin.find(
+      { [matchField]: { $all: [a, b] } },
+      { tin: 1 }
+    ).lean()).map(d => d.tin);
+  }
+
+  res.json({ a, b, field, count: tins.length, tins });
+};
+
 // Export — land_fund_category
 exports.exportCrossMatrix = async (req, res) => {
   const result = await buildCrossMatrix('land_fund_category');

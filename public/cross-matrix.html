@@ -120,6 +120,67 @@
 
     .loading { text-align: center; padding: 48px; color: #aaa; font-size: 0.9rem; }
 
+    /* Modal */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.45);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-overlay.show { display: flex; }
+    .modal {
+      background: #fff;
+      border-radius: 12px;
+      width: 480px;
+      max-width: 95vw;
+      max-height: 80vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 8px 32px rgba(0,0,0,.18);
+    }
+    .modal-head {
+      padding: 18px 22px 14px;
+      border-bottom: 1px solid #eee;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .modal-head h3 { font-size: 0.95rem; font-weight: 700; color: #1a1a2e; }
+    .modal-head .sub { font-size: 0.78rem; color: #888; margin-top: 3px; }
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 1.3rem;
+      cursor: pointer;
+      color: #aaa;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+    .modal-close:hover { color: #333; }
+    .modal-body {
+      overflow-y: auto;
+      padding: 14px 22px 18px;
+      flex: 1;
+    }
+    .tin-item {
+      padding: 7px 0;
+      border-bottom: 1px solid #f2f2f2;
+      font-size: 0.88rem;
+      color: #1a1a2e;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .tin-item:last-child { border-bottom: none; }
+    .tin-num { color: #aaa; font-size: 0.75rem; min-width: 28px; }
+    .modal-empty { text-align: center; padding: 32px; color: #bbb; font-size: 0.88rem; }
+    td.cell { cursor: pointer; }
+    td.cell:hover { filter: brightness(0.93); }
+
     .card-header {
       display: flex;
       align-items: flex-start;
@@ -168,6 +229,22 @@
     <a href="/cross-matrix.html" class="active">Cross Matrix</a>
   </nav>
 </header>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modal-overlay" onclick="closeModal(event)">
+  <div class="modal">
+    <div class="modal-head">
+      <div>
+        <h3 id="modal-title">TINlar</h3>
+        <div class="sub" id="modal-sub"></div>
+      </div>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <div class="modal-body" id="modal-body">
+      <div class="modal-empty">Yuklanmoqda...</div>
+    </div>
+  </div>
+</div>
 
 <div class="page">
   <div class="card">
@@ -236,7 +313,7 @@ function cellBg(val, max, isDiag) {
   return `rgba(79,200,150,${0.06 + intensity / 200})`;
 }
 
-function buildTable(categories, map, wrapId) {
+function buildTable(categories, map, wrapId, field) {
   const maxVal = Math.max(...Object.values(map));
   let html = '<table><thead><tr>';
   html += '<th class="corner"></th>';
@@ -251,7 +328,7 @@ function buildTable(categories, map, wrapId) {
       const bg   = cellBg(val, maxVal, diag);
       const cls  = `cell${diag ? ' diag' : ''}${!val ? ' zero' : ''}`;
       const tip  = `${catA} ∩ ${catB}: ${fmt(val)} TIN`;
-      html += `<td class="${cls}" style="${bg ? `background:${bg}` : ''}" data-tip="${tip}">${fmt(val)}</td>`;
+      html += `<td class="${cls}" style="${bg ? `background:${bg}` : ''}" data-tip="${tip}" onclick="showTins('${field}','${catA}','${catB}',${val})">${fmt(val)}</td>`;
     });
     html += '</tr>';
   });
@@ -261,11 +338,11 @@ function buildTable(categories, map, wrapId) {
 
 fetch('/api/agri-land-tins/cross-matrix')
   .then(r => r.json())
-  .then(({ categories, map }) => buildTable(categories, map, 'table-wrap'));
+  .then(({ categories, map }) => buildTable(categories, map, 'table-wrap', 'land_fund_category'));
 
 fetch('/api/agri-land-tins/cross-matrix-type')
   .then(r => r.json())
-  .then(({ categories, map }) => buildTable(categories, map, 'table-wrap-type'));
+  .then(({ categories, map }) => buildTable(categories, map, 'table-wrap-type', 'land_fund_type'));
 
 function downloadXlsx(endpoint, filename) {
   const a = document.createElement('a');
@@ -273,6 +350,39 @@ function downloadXlsx(endpoint, filename) {
   a.download = filename;
   a.click();
 }
+
+// Modal
+function showTins(field, a, b, count) {
+  if (!count) return;
+  document.getElementById('modal-title').textContent = a === b
+    ? `${a} — barcha TINlar`
+    : `${a} ∩ ${b}`;
+  document.getElementById('modal-sub').textContent = `Yuklanmoqda...`;
+  document.getElementById('modal-body').innerHTML = '<div class="modal-empty">Yuklanmoqda...</div>';
+  document.getElementById('modal-overlay').classList.add('show');
+
+  fetch(`/api/agri-land-tins/tin-list?field=${field}&a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}`)
+    .then(r => r.json())
+    .then(({ tins, count: total }) => {
+      document.getElementById('modal-sub').textContent = `Jami: ${total.toLocaleString('uz-UZ')} ta TIN`;
+      if (!tins.length) {
+        document.getElementById('modal-body').innerHTML = '<div class="modal-empty">TIN topilmadi</div>';
+        return;
+      }
+      document.getElementById('modal-body').innerHTML = tins.map((tin, i) =>
+        `<div class="tin-item"><span class="tin-num">${i + 1}</span>${tin}</div>`
+      ).join('');
+    });
+}
+
+function closeModal(e) {
+  if (e && e.target !== document.getElementById('modal-overlay')) return;
+  document.getElementById('modal-overlay').classList.remove('show');
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') document.getElementById('modal-overlay').classList.remove('show');
+});
 </script>
 </body>
 </html>

@@ -20,6 +20,9 @@ router.get('/by-tenancy',       ctrl.byTenancy);
 // category soni bo'yicha taqsimot (nechtada 1 ta, 2 ta, 3 ta...)
 router.get('/by-category-count', ctrl.byCategoryCount);
 
+// TIN ro'yxati — yacheyka uchun
+router.get('/tin-list',                  ctrl.tinList);
+
 // Cross matrix
 router.get('/cross-matrix',              ctrl.crossMatrix);
 router.get('/cross-matrix-type',         ctrl.crossMatrixType);
