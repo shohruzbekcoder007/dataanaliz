@@ -164,12 +164,31 @@
       </div>
     </div>
   </div>
+
+  <div class="card" style="margin-top:24px">
+    <h2>Land Fund Type × Land Fund Type</h2>
+    <p class="desc">Ikki land_fund_type ga bir vaqtda ega bo'lgan TINlar soni. Diagonal — o'sha typega ega jami TINlar.</p>
+
+    <div class="table-wrap" id="table-wrap-type">
+      <div class="loading">Yuklanmoqda...</div>
+    </div>
+
+    <div class="legend">
+      <div class="legend-item">
+        <div class="legend-box" style="background:#eef0ff;border:1px solid #c0c8ff"></div>
+        Diagonal — faqat o'sha typega ega TINlar soni
+      </div>
+      <div class="legend-item">
+        <div class="legend-box" style="background:#fff;border:1px solid #e8ecf4"></div>
+        Kesishma — ikkala typega ham ega TINlar soni
+      </div>
+    </div>
+  </div>
 </div>
 
 <script>
 function fmt(n) { return n ? Number(n).toLocaleString('uz-UZ') : '0'; }
 
-// Qiymatga qarab fon rangi (qanchalik ko'p — shunchalik to'q)
 function cellBg(val, max, isDiag) {
   if (!val) return '';
   if (isDiag) {
@@ -180,35 +199,36 @@ function cellBg(val, max, isDiag) {
   return `rgba(79,200,150,${0.06 + intensity / 200})`;
 }
 
+function buildTable(categories, map, wrapId) {
+  const maxVal = Math.max(...Object.values(map));
+  let html = '<table><thead><tr>';
+  html += '<th class="corner"></th>';
+  categories.forEach(cat => { html += `<th class="col-head">${cat}</th>`; });
+  html += '</tr></thead><tbody>';
+  categories.forEach(catA => {
+    html += `<tr><th class="row-head">${catA}</th>`;
+    categories.forEach(catB => {
+      const key  = `${catA}|${catB}`;
+      const val  = map[key] || 0;
+      const diag = catA === catB;
+      const bg   = cellBg(val, maxVal, diag);
+      const cls  = `cell${diag ? ' diag' : ''}${!val ? ' zero' : ''}`;
+      const tip  = `${catA} ∩ ${catB}: ${fmt(val)} TIN`;
+      html += `<td class="${cls}" style="${bg ? `background:${bg}` : ''}" data-tip="${tip}">${fmt(val)}</td>`;
+    });
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  document.getElementById(wrapId).innerHTML = html;
+}
+
 fetch('/api/agri-land-tins/cross-matrix')
   .then(r => r.json())
-  .then(({ categories, map }) => {
-    const maxVal = Math.max(...Object.values(map));
+  .then(({ categories, map }) => buildTable(categories, map, 'table-wrap'));
 
-    let html = '<table><thead><tr>';
-    html += '<th class="corner"></th>';
-    categories.forEach(cat => {
-      html += `<th class="col-head">${cat}</th>`;
-    });
-    html += '</tr></thead><tbody>';
-
-    categories.forEach(catA => {
-      html += `<tr><th class="row-head">${catA}</th>`;
-      categories.forEach(catB => {
-        const key   = `${catA}|${catB}`;
-        const val   = map[key] || 0;
-        const diag  = catA === catB;
-        const bg    = cellBg(val, maxVal, diag);
-        const cls   = `cell${diag ? ' diag' : ''}${!val ? ' zero' : ''}`;
-        const tip   = `${catA} ∩ ${catB}: ${fmt(val)} TIN`;
-        html += `<td class="${cls}" style="${bg ? `background:${bg}` : ''}" data-tip="${tip}">${fmt(val)}</td>`;
-      });
-      html += '</tr>';
-    });
-
-    html += '</tbody></table>';
-    document.getElementById('table-wrap').innerHTML = html;
-  });
+fetch('/api/agri-land-tins/cross-matrix-type')
+  .then(r => r.json())
+  .then(({ categories, map }) => buildTable(categories, map, 'table-wrap-type'));
 </script>
 </body>
 </html>

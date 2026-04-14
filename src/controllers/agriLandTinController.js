@@ -114,13 +114,11 @@ exports.byCategoryCount = async (req, res) => {
   res.json(data);
 };
 
-// Cross matrix — land_fund_category × land_fund_category, qiymat = ikkalasida ham qatnashgan TIN soni
-exports.crossMatrix = async (req, res) => {
+// Cross matrix — umumiy helper
+async function buildCrossMatrix(field) {
   const data = await AgriLandTin.aggregate([
-    // Har TIN uchun unique categorylar
-    { $project: { cats: { $setUnion: ['$category.land_fund_category'] } } },
+    { $project: { cats: { $setUnion: [`$category.${field}`] } } },
     { $match: { cats: { $ne: [] } } },
-    // catA va catB — ikki marta unwind (cross join)
     { $project: { catA: '$cats', catB: '$cats' } },
     { $unwind: '$catA' },
     { $unwind: '$catB' },
@@ -129,16 +127,24 @@ exports.crossMatrix = async (req, res) => {
     { $sort: { '_id.catA': 1, '_id.catB': 1 } },
   ], { allowDiskUse: true });
 
-  // Barcha categorylarni yig'amiz
   const catSet = new Set();
   data.forEach(d => { catSet.add(d._id.catA); catSet.add(d._id.catB); });
   const categories = [...catSet].sort();
-
-  // Map: catA|catB -> count
   const map = {};
   data.forEach(d => { map[`${d._id.catA}|${d._id.catB}`] = d.count; });
+  return { categories, map };
+}
 
-  res.json({ categories, map });
+// Cross matrix — land_fund_category × land_fund_category
+exports.crossMatrix = async (req, res) => {
+  const result = await buildCrossMatrix('land_fund_category');
+  res.json(result);
+};
+
+// Cross matrix — land_fund_type × land_fund_type
+exports.crossMatrixType = async (req, res) => {
+  const result = await buildCrossMatrix('land_fund_type');
+  res.json(result);
 };
 
 // property_kind — category filter bilan
