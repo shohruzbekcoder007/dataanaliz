@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AgriLandTin Analiz</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f0f2f5;
+      color: #1a1a2e;
+    }
+
+    header {
+      background: #1a1a2e;
+      color: #fff;
+      padding: 18px 32px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    header h1 { font-size: 1.3rem; font-weight: 600; }
+    header span { font-size: 0.85rem; opacity: 0.6; margin-top: 2px; }
+
+    .stats-bar {
+      display: flex;
+      gap: 16px;
+      padding: 20px 32px;
+      flex-wrap: wrap;
+    }
+    .stat-card {
+      background: #fff;
+      border-radius: 10px;
+      padding: 18px 24px;
+      flex: 1;
+      min-width: 160px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08);
+    }
+    .stat-card .label { font-size: 0.75rem; color: #888; text-transform: uppercase; letter-spacing: .05em; }
+    .stat-card .value { font-size: 1.9rem; font-weight: 700; margin-top: 4px; color: #1a1a2e; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(440px, 1fr));
+      gap: 20px;
+      padding: 0 32px 32px;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 10px;
+      padding: 22px 24px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08);
+    }
+    .card h2 {
+      font-size: 0.95rem;
+      font-weight: 600;
+      margin-bottom: 18px;
+      color: #444;
+    }
+
+    .tin-search {
+      padding: 0 32px 20px;
+    }
+    .tin-search .inner {
+      background: #fff;
+      border-radius: 10px;
+      padding: 20px 24px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08);
+    }
+    .tin-search h2 { font-size: 0.95rem; font-weight: 600; color: #444; margin-bottom: 14px; }
+    .tin-search .row { display: flex; gap: 10px; }
+    .tin-search input {
+      flex: 1;
+      padding: 9px 14px;
+      border: 1px solid #ddd;
+      border-radius: 7px;
+      font-size: 0.95rem;
+      outline: none;
+    }
+    .tin-search input:focus { border-color: #4f6ef7; }
+    .tin-search button {
+      padding: 9px 22px;
+      background: #4f6ef7;
+      color: #fff;
+      border: none;
+      border-radius: 7px;
+      cursor: pointer;
+      font-size: 0.95rem;
+    }
+    .tin-search button:hover { background: #3a56d4; }
+
+    #tin-result {
+      margin-top: 14px;
+      display: none;
+    }
+    #tin-result .tin-val {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 10px;
+      color: #1a1a2e;
+    }
+    .cat-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 340px;
+      overflow-y: auto;
+    }
+    .cat-item {
+      background: #f8f9ff;
+      border: 1px solid #e8ecff;
+      border-radius: 7px;
+      padding: 10px 14px;
+      font-size: 0.83rem;
+      line-height: 1.6;
+    }
+    .cat-item b { color: #4f6ef7; }
+    #tin-error { color: #e55; font-size: 0.9rem; margin-top: 8px; display: none; }
+
+    .loading { text-align: center; padding: 40px; color: #aaa; font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>AgriLandTin — Analiz paneli</h1>
+    <span>agri_land_tins collection statistikasi</span>
+  </div>
+</header>
+
+<!-- Statistika kartalar -->
+<div class="stats-bar">
+  <div class="stat-card">
+    <div class="label">Jami TIN</div>
+    <div class="value" id="s-tins">...</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Jami Category</div>
+    <div class="value" id="s-cats">...</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">O'rtacha Category</div>
+    <div class="value" id="s-avg">...</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Maksimal Category</div>
+    <div class="value" id="s-max">...</div>
+  </div>
+</div>
+
+<!-- TIN qidiruv -->
+<div class="tin-search">
+  <div class="inner">
+    <h2>TIN bo'yicha qidiruv</h2>
+    <div class="row">
+      <input id="tin-input" type="text" placeholder="TIN kiriting..." />
+      <button onclick="searchTin()">Qidirish</button>
+    </div>
+    <div id="tin-error">Topilmadi</div>
+    <div id="tin-result">
+      <div class="tin-val" id="tin-result-title"></div>
+      <div class="cat-list" id="cat-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Grafiklar -->
+<div class="grid">
+  <div class="card">
+    <h2>Land Fund Category bo'yicha</h2>
+    <canvas id="chart-category" height="220"></canvas>
+  </div>
+  <div class="card">
+    <h2>Property Kind bo'yicha</h2>
+    <canvas id="chart-property" height="220"></canvas>
+  </div>
+  <div class="card">
+    <h2>Tenancy Type bo'yicha</h2>
+    <canvas id="chart-tenancy" height="220"></canvas>
+  </div>
+  <div class="card">
+    <h2>Category soni bo'yicha TIN taqsimoti (1–10)</h2>
+    <canvas id="chart-count" height="220"></canvas>
+  </div>
+</div>
+
+<script>
+const API = '/api/agri-land-tins';
+
+const COLORS = [
+  '#4f6ef7','#f7914f','#4fc9f7','#f74f6e','#6ef74f',
+  '#f7e14f','#a04ff7','#4ff7a0','#f74fa0','#8f8f8f'
+];
+
+async function get(url) {
+  const r = await fetch(url);
+  return r.json();
+}
+
+function fmt(n) {
+  return Number(n).toLocaleString('uz-UZ');
+}
+
+// Stats
+get(`${API}/stats`).then(d => {
+  document.getElementById('s-tins').textContent = fmt(d.total_tins);
+  document.getElementById('s-cats').textContent = fmt(d.total_categories);
+  document.getElementById('s-avg').textContent  = d.avg_categories;
+  document.getElementById('s-max').textContent  = fmt(d.max_categories);
+});
+
+// Category chart
+get(`${API}/by-category`).then(data => {
+  const labels = data.map(d => d._id || 'Noma\'lum');
+  const values = data.map(d => d.count);
+  new Chart(document.getElementById('chart-category'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{ data: values, backgroundColor: COLORS, borderRadius: 5 }],
+    },
+    options: {
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true } },
+    },
+  });
+});
+
+// Property kind chart
+get(`${API}/by-property-kind`).then(data => {
+  const labels = data.map(d => (d._id || 'Noma\'lum').replace('prop_kind_', ''));
+  const values = data.map(d => d.count);
+  new Chart(document.getElementById('chart-property'), {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{ data: values, backgroundColor: COLORS }],
+    },
+    options: {
+      plugins: { legend: { position: 'right', labels: { font: { size: 11 } } } },
+    },
+  });
+});
+
+// Tenancy chart
+get(`${API}/by-tenancy`).then(data => {
+  const labels = data.map(d => (d._id || 'Noma\'lum').replace('tenancy_type_', ''));
+  const values = data.map(d => d.count);
+  new Chart(document.getElementById('chart-tenancy'), {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{ data: values, backgroundColor: COLORS }],
+    },
+    options: {
+      plugins: { legend: { position: 'right', labels: { font: { size: 11 } } } },
+    },
+  });
+});
+
+// Category count chart (1-10 gacha)
+get(`${API}/by-category-count`).then(data => {
+  const top = data.filter(d => d.category_count <= 10);
+  new Chart(document.getElementById('chart-count'), {
+    type: 'bar',
+    data: {
+      labels: top.map(d => `${d.category_count} ta`),
+      datasets: [{
+        data: top.map(d => d.tin_count),
+        backgroundColor: '#4f6ef7',
+        borderRadius: 5,
+      }],
+    },
+    options: {
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true } },
+    },
+  });
+});
+
+// TIN qidiruv
+async function searchTin() {
+  const tin = document.getElementById('tin-input').value.trim();
+  if (!tin) return;
+
+  const errEl    = document.getElementById('tin-error');
+  const resultEl = document.getElementById('tin-result');
+  errEl.style.display    = 'none';
+  resultEl.style.display = 'none';
+
+  const data = await get(`${API}/tin/${tin}`);
+  if (data.message) {
+    errEl.style.display = 'block';
+    return;
+  }
+
+  document.getElementById('tin-result-title').textContent =
+    `TIN: ${data.tin}  —  ${data.category.length} ta category`;
+
+  const list = document.getElementById('cat-list');
+  list.innerHTML = data.category.map((c, i) => `
+    <div class="cat-item">
+      <b>#${i + 1}</b> &nbsp;
+      <b>Kadastr:</b> ${c.cadastral_number || '—'} &nbsp;|&nbsp;
+      <b>Category:</b> ${c.land_fund_category || '—'} &nbsp;|&nbsp;
+      <b>Type:</b> ${c.land_fund_type || '—'}<br>
+      ${c.land_fund_type_description || ''}<br>
+      <b>Property:</b> ${c.property_kind || '—'} &nbsp;|&nbsp;
+      <b>Tenancy:</b> ${c.tenancy_type_code || '—'}
+    </div>
+  `).join('');
+
+  resultEl.style.display = 'block';
+}
+
+document.getElementById('tin-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') searchTin();
+});
+</script>
+</body>
+</html>
