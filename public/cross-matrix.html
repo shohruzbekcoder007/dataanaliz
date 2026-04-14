@@ -180,6 +180,54 @@
     .modal-empty { text-align: center; padding: 32px; color: #bbb; font-size: 0.88rem; }
     td.cell { cursor: pointer; }
     td.cell:hover { filter: brightness(0.93); }
+    td.cell.highlight {
+      outline: 3px solid #f7914f;
+      outline-offset: -2px;
+      z-index: 1;
+      position: relative;
+    }
+
+    /* Filter bar */
+    .filter-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    .filter-bar label { font-size: 0.8rem; color: #666; white-space: nowrap; }
+    .filter-bar select {
+      padding: 7px 12px;
+      border: 1px solid #ddd;
+      border-radius: 7px;
+      font-size: 0.85rem;
+      outline: none;
+      min-width: 160px;
+      background: #fafbff;
+    }
+    .filter-bar select:focus { border-color: #4f6ef7; }
+    .filter-bar .sep { color: #aaa; font-size: 1rem; }
+    .btn-go {
+      padding: 7px 18px;
+      background: #4f6ef7;
+      color: #fff;
+      border: none;
+      border-radius: 7px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-go:hover { background: #3a56d4; }
+    .btn-clear {
+      padding: 7px 14px;
+      background: #f0f2f5;
+      color: #666;
+      border: none;
+      border-radius: 7px;
+      font-size: 0.85rem;
+      cursor: pointer;
+    }
+    .btn-clear:hover { background: #e0e4ec; }
 
     .card-header {
       display: flex;
@@ -258,6 +306,14 @@
         XLSX yuklab olish
       </button>
     </div>
+    <div class="filter-bar">
+      <label>1-category:</label>
+      <select id="sel-cat-a" onchange="goToCell('cat')"><option value="">— tanlang —</option></select>
+      <span class="sep">∩</span>
+      <label>2-category:</label>
+      <select id="sel-cat-b" onchange="goToCell('cat')"><option value="">— tanlang —</option></select>
+      <button class="btn-clear" onclick="clearFilter('cat')">Tozalash</button>
+    </div>
     <div class="table-wrap" id="table-wrap">
       <div class="loading">Yuklanmoqda...</div>
     </div>
@@ -283,6 +339,14 @@
         <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 1.5L18.5 9H13V3.5zM8 17l3-4h-2v-3h2v-2H9v2H7v3H5l3 4zm8-4h-4v2h4v-2zm0-3h-4v2h4v-2z"/></svg>
         XLSX yuklab olish
       </button>
+    </div>
+    <div class="filter-bar">
+      <label>1-type:</label>
+      <select id="sel-type-a" onchange="goToCell('type')"><option value="">— tanlang —</option></select>
+      <span class="sep">∩</span>
+      <label>2-type:</label>
+      <select id="sel-type-b" onchange="goToCell('type')"><option value="">— tanlang —</option></select>
+      <button class="btn-clear" onclick="clearFilter('type')">Tozalash</button>
     </div>
     <div class="table-wrap" id="table-wrap-type">
       <div class="loading">Yuklanmoqda...</div>
@@ -336,13 +400,30 @@ function buildTable(categories, map, wrapId, field) {
   document.getElementById(wrapId).innerHTML = html;
 }
 
+function fillSelect(selId, categories) {
+  const sel = document.getElementById(selId);
+  categories.forEach(c => {
+    const o = document.createElement('option');
+    o.value = o.textContent = c;
+    sel.appendChild(o);
+  });
+}
+
 fetch('/api/agri-land-tins/cross-matrix')
   .then(r => r.json())
-  .then(({ categories, map }) => buildTable(categories, map, 'table-wrap', 'land_fund_category'));
+  .then(({ categories, map }) => {
+    buildTable(categories, map, 'table-wrap', 'land_fund_category');
+    fillSelect('sel-cat-a', categories);
+    fillSelect('sel-cat-b', categories);
+  });
 
 fetch('/api/agri-land-tins/cross-matrix-type')
   .then(r => r.json())
-  .then(({ categories, map }) => buildTable(categories, map, 'table-wrap-type', 'land_fund_type'));
+  .then(({ categories, map }) => {
+    buildTable(categories, map, 'table-wrap-type', 'land_fund_type');
+    fillSelect('sel-type-a', categories);
+    fillSelect('sel-type-b', categories);
+  });
 
 function downloadXlsx(endpoint, filename) {
   const a = document.createElement('a');
@@ -373,6 +454,36 @@ function showTins(field, a, b, count) {
         `<div class="tin-item"><span class="tin-num">${i + 1}</span>${tin}</div>`
       ).join('');
     });
+}
+
+// Yacheykaga scroll + highlight
+function goToCell(tbl) {
+  const a = document.getElementById(tbl === 'cat' ? 'sel-cat-a' : 'sel-type-a').value;
+  const b = document.getElementById(tbl === 'cat' ? 'sel-cat-b' : 'sel-type-b').value;
+  if (!a || !b) return;
+
+  // Oldingi highlight larni olib tashla
+  document.querySelectorAll('td.cell.highlight').forEach(el => el.classList.remove('highlight'));
+
+  // data-tip orqali ikki yacheykani topamiz: a∩b va b∩a
+  const pairs = [`${a} ∩ ${b}`, `${b} ∩ ${a}`];
+  let first = null;
+
+  document.querySelectorAll('td.cell').forEach(td => {
+    const tip = td.getAttribute('data-tip') || '';
+    if (pairs.some(p => tip.startsWith(p))) {
+      td.classList.add('highlight');
+      if (!first) first = td;
+    }
+  });
+
+  if (first) first.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+}
+
+function clearFilter(tbl) {
+  document.getElementById(tbl === 'cat' ? 'sel-cat-a' : 'sel-type-a').value = '';
+  document.getElementById(tbl === 'cat' ? 'sel-cat-b' : 'sel-type-b').value = '';
+  document.querySelectorAll('td.cell.highlight').forEach(el => el.classList.remove('highlight'));
 }
 
 function closeModal(e) {
