@@ -282,9 +282,23 @@
 <div class="modal-overlay" id="modal-overlay" onclick="closeModal(event)">
   <div class="modal">
     <div class="modal-head">
-      <div>
+      <div style="flex:1">
         <h3 id="modal-title">TINlar</h3>
         <div class="sub" id="modal-sub"></div>
+        <div id="modal-areas" style="margin-top:10px;display:none">
+          <div style="display:flex;gap:12px;flex-wrap:wrap">
+            <div id="area-a" style="background:#eef0ff;border-radius:7px;padding:8px 14px;min-width:160px">
+              <div style="font-size:0.72rem;color:#888;font-weight:600" id="area-a-label"></div>
+              <div style="font-size:1.1rem;font-weight:700;color:#4f6ef7;margin-top:2px" id="area-a-val">—</div>
+              <div style="font-size:0.72rem;color:#aaa" id="area-a-count"></div>
+            </div>
+            <div id="area-b" style="background:#edfff5;border-radius:7px;padding:8px 14px;min-width:160px;display:none">
+              <div style="font-size:0.72rem;color:#888;font-weight:600" id="area-b-label"></div>
+              <div style="font-size:1.1rem;font-weight:700;color:#1a7a4a;margin-top:2px" id="area-b-val">—</div>
+              <div style="font-size:0.72rem;color:#aaa" id="area-b-count"></div>
+            </div>
+          </div>
+        </div>
       </div>
       <button class="modal-close" onclick="closeModal()">×</button>
     </div>
@@ -438,14 +452,38 @@ function showTins(field, a, b, count) {
   document.getElementById('modal-title').textContent = a === b
     ? `${a} — barcha TINlar`
     : `${a} ∩ ${b}`;
-  document.getElementById('modal-sub').textContent = `Yuklanmoqda...`;
+  document.getElementById('modal-sub').textContent = 'Yuklanmoqda...';
   document.getElementById('modal-body').innerHTML = '<div class="modal-empty">Yuklanmoqda...</div>';
+  document.getElementById('modal-areas').style.display = 'none';
   document.getElementById('modal-overlay').classList.add('show');
 
   fetch(`/api/agri-land-tins/tin-list?field=${field}&a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}`)
     .then(r => r.json())
-    .then(({ tins, count: total }) => {
+    .then(({ tins, count: total, areas }) => {
       document.getElementById('modal-sub').textContent = `Jami: ${total.toLocaleString('uz-UZ')} ta TIN`;
+
+      // Maydon summasi
+      const areasEl = document.getElementById('modal-areas');
+      areasEl.style.display = 'block';
+
+      function fillArea(elId, labelId, valId, countId, key, color) {
+        const d = (areas || {})[key];
+        document.getElementById(labelId).textContent = key;
+        document.getElementById(valId).textContent   = d ? `${Number(d.area).toLocaleString('uz-UZ')} ga` : '—';
+        document.getElementById(countId).textContent = d
+          ? `${d.cadastral_count.toLocaleString('uz-UZ')} ta yozuv · ${d.unique_cadastral.toLocaleString('uz-UZ')} unique kadastr`
+          : 'topilmadi';
+        document.getElementById(elId).style.display = 'block';
+      }
+
+      fillArea('area-a', 'area-a-label', 'area-a-val', 'area-a-count', a);
+      const bEl = document.getElementById('area-b');
+      if (a !== b) {
+        fillArea('area-b', 'area-b-label', 'area-b-val', 'area-b-count', b);
+      } else {
+        bEl.style.display = 'none';
+      }
+
       if (!tins.length) {
         document.getElementById('modal-body').innerHTML = '<div class="modal-empty">TIN topilmadi</div>';
         return;

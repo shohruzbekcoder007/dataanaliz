@@ -190,34 +190,57 @@ function matrixToXlsx({ categories, map }, sheetName) {
   return XLSX.write(wb, { bookType: 'xlsx', type: 'buffer' });
 }
 
-// Yacheyka bosilganda — ikkala qiymatga ega TINlar ro'yxati
+// Yacheyka bosilganda — ikkala qiymatga ega TINlar ro'yxati + maydon summasi
 // GET /tin-list?field=land_fund_category&a=006001&b=006003
 exports.tinList = async (req, res) => {
   const { field = 'land_fund_category', a, b } = req.query;
   if (!a || !b) return res.status(400).json({ message: 'a va b parametrlari kerak' });
 
   const matchField = `category.${field}`;
-  const data = await AgriLandTin.find(
-    { [matchField]: a, ...(a !== b ? { [matchField]: { $all: [a, b] } } : { [matchField]: a }) },
-    { tin: 1 }
-  ).lean();
 
-  // a === b (diagonal) — faqat a ga ega TINlar
-  // a !== b — ikkalasiga ham ega TINlar
-  let tins;
-  if (a === b) {
-    tins = (await AgriLandTin.find(
-      { [matchField]: a },
-      { tin: 1 }
-    ).lean()).map(d => d.tin);
-  } else {
-    tins = (await AgriLandTin.find(
-      { [matchField]: { $all: [a, b] } },
-      { tin: 1 }
-    ).lean()).map(d => d.tin);
-  }
+  // TINlar ro'yxati
+  const tinDocs = a === b
+    ? await AgriLandTin.find({ [matchField]: a }, { tin: 1 }).lean()
+    : await AgriLandTin.find({ [matchField]: { $all: [a, b] } }, { tin: 1 }).lean();
 
-  res.json({ a, b, field, count: tins.length, tins });
+  const tins = tinDocs.map(d => d.tin).filter(Boolean);
+
+  // agri_land_full dan: tin + field bo'yicha area va cadastral_number soni
+  const col = require('mongoose').connection.db.collection('agri_land_full');
+
+  const values = a === b ? [a] : [a, b];
+  const areaAgg = await col.aggregate([
+    {
+      $match: {
+        tin: { $in: tins },
+        [field]: { $in: values },
+      },
+    },
+    {
+      $group: {
+        _id:               `$${field}`,
+        area_sum:          {
+          $sum: {
+            $convert: { input: '$gis_area_ha', to: 'double', onError: 0, onNull: 0 },
+          },
+        },
+        cadastral_count:   { $sum: 1 },
+        cadastral_numbers: { $addToSet: '$cadastral_number' },
+      },
+    },
+    { $sort: { _id: 1 } },
+  ]).toArray();
+
+  const areas = {};
+  areaAgg.forEach(r => {
+    areas[r._id] = {
+      area:             +r.area_sum.toFixed(4),
+      cadastral_count:  r.cadastral_count,
+      unique_cadastral: r.cadastral_numbers.filter(Boolean).length,
+    };
+  });
+
+  res.json({ a, b, field, count: tins.length, tins, areas });
 };
 
 // Export — land_fund_category
