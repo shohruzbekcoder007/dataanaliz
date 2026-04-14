@@ -1,4 +1,5 @@
 const AgriLandTin = require('../models/AgriLandTin');
+const XLSX        = require('xlsx');
 
 // Umumiy statistika
 exports.getStats = async (req, res) => {
@@ -145,6 +146,66 @@ exports.crossMatrix = async (req, res) => {
 exports.crossMatrixType = async (req, res) => {
   const result = await buildCrossMatrix('land_fund_type');
   res.json(result);
+};
+
+// XLSX export helper
+function matrixToXlsx({ categories, map }, sheetName) {
+  const wb = XLSX.utils.book_new();
+
+  // aoa (array of arrays) quramiz
+  const aoa = [['', ...categories]];
+  categories.forEach(catA => {
+    const row = [catA, ...categories.map(catB => map[`${catA}|${catB}`] || 0)];
+    aoa.push(row);
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+
+  // Ustun kengligi
+  ws['!cols'] = [{ wch: 18 }, ...categories.map(() => ({ wch: 14 }))];
+
+  // Header va diagonal cellarga style
+  const n = categories.length;
+  for (let r = 0; r <= n; r++) {
+    for (let c = 0; c <= n; c++) {
+      const addr = XLSX.utils.encode_cell({ r, c });
+      if (!ws[addr]) continue;
+      const isHeader = r === 0 || c === 0;
+      const isDiag   = r > 0 && c > 0 && categories[r - 1] === categories[c - 1];
+      ws[addr].s = {
+        font:      isHeader ? { bold: true, color: { rgb: 'FFFFFF' } } : isDiag ? { bold: true, color: { rgb: '4F6EF7' } } : {},
+        fill:      isHeader ? { patternType: 'solid', fgColor: { rgb: '1A1A2E' } } : isDiag ? { patternType: 'solid', fgColor: { rgb: 'EEF0FF' } } : {},
+        alignment: { horizontal: 'center', vertical: 'center' },
+        border: {
+          top:    { style: 'thin', color: { rgb: 'E0E4F0' } },
+          bottom: { style: 'thin', color: { rgb: 'E0E4F0' } },
+          left:   { style: 'thin', color: { rgb: 'E0E4F0' } },
+          right:  { style: 'thin', color: { rgb: 'E0E4F0' } },
+        },
+      };
+    }
+  }
+
+  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+  return XLSX.write(wb, { bookType: 'xlsx', type: 'buffer' });
+}
+
+// Export — land_fund_category
+exports.exportCrossMatrix = async (req, res) => {
+  const result = await buildCrossMatrix('land_fund_category');
+  const buf    = matrixToXlsx(result, 'Category');
+  res.setHeader('Content-Disposition', 'attachment; filename="land_fund_category_matrix.xlsx"');
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.send(buf);
+};
+
+// Export — land_fund_type
+exports.exportCrossMatrixType = async (req, res) => {
+  const result = await buildCrossMatrix('land_fund_type');
+  const buf    = matrixToXlsx(result, 'Type');
+  res.setHeader('Content-Disposition', 'attachment; filename="land_fund_type_matrix.xlsx"');
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.send(buf);
 };
 
 // property_kind — category filter bilan

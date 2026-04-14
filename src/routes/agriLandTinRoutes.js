@@ -21,8 +21,10 @@ router.get('/by-tenancy',       ctrl.byTenancy);
 router.get('/by-category-count', ctrl.byCategoryCount);
 
 // Cross matrix
-router.get('/cross-matrix',         ctrl.crossMatrix);
-router.get('/cross-matrix-type',    ctrl.crossMatrixType);
+router.get('/cross-matrix',              ctrl.crossMatrix);
+router.get('/cross-matrix-type',         ctrl.crossMatrixType);
+router.get('/cross-matrix/export',       ctrl.exportCrossMatrix);
+router.get('/cross-matrix-type/export',  ctrl.exportCrossMatrixType);
 
 // property_kind va tenancy — category filter bilan
 router.get('/by-property-kind-cat', ctrl.byPropertyKindCat);

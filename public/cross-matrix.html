@@ -120,6 +120,31 @@
 
     .loading { text-align: center; padding: 48px; color: #aaa; font-size: 0.9rem; }
 
+    .card-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+    .card-header div { flex: 1; }
+    .btn-export {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 16px;
+      background: #1a7a4a;
+      color: #fff;
+      border: none;
+      border-radius: 7px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .btn-export:hover { background: #155e39; }
+    .btn-export svg { width: 14px; height: 14px; fill: #fff; }
+
     /* Legenda */
     .legend {
       display: flex;
@@ -146,13 +171,19 @@
 
 <div class="page">
   <div class="card">
-    <h2>Land Fund Category × Land Fund Category</h2>
-    <p class="desc">Ikki categoryga bir vaqtda ega bo'lgan TINlar soni. Diagonal — o'sha categoryga ega jami TINlar.</p>
-
+    <div class="card-header">
+      <div>
+        <h2>Land Fund Category × Land Fund Category</h2>
+        <p class="desc">Ikki categoryga bir vaqtda ega bo'lgan TINlar soni. Diagonal — o'sha categoryga ega jami TINlar.</p>
+      </div>
+      <button class="btn-export" onclick="downloadXlsx('cross-matrix/export', 'land_fund_category_matrix.xlsx')">
+        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 1.5L18.5 9H13V3.5zM8 17l3-4h-2v-3h2v-2H9v2H7v3H5l3 4zm8-4h-4v2h4v-2zm0-3h-4v2h4v-2z"/></svg>
+        XLSX yuklab olish
+      </button>
+    </div>
     <div class="table-wrap" id="table-wrap">
       <div class="loading">Yuklanmoqda...</div>
     </div>
-
     <div class="legend">
       <div class="legend-item">
         <div class="legend-box" style="background:#eef0ff;border:1px solid #c0c8ff"></div>
@@ -166,13 +197,19 @@
   </div>
 
   <div class="card" style="margin-top:24px">
-    <h2>Land Fund Type × Land Fund Type</h2>
-    <p class="desc">Ikki land_fund_type ga bir vaqtda ega bo'lgan TINlar soni. Diagonal — o'sha typega ega jami TINlar.</p>
-
+    <div class="card-header">
+      <div>
+        <h2>Land Fund Type × Land Fund Type</h2>
+        <p class="desc">Ikki land_fund_type ga bir vaqtda ega bo'lgan TINlar soni. Diagonal — o'sha typega ega jami TINlar.</p>
+      </div>
+      <button class="btn-export" onclick="downloadXlsx('cross-matrix-type/export', 'land_fund_type_matrix.xlsx')">
+        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 1.5L18.5 9H13V3.5zM8 17l3-4h-2v-3h2v-2H9v2H7v3H5l3 4zm8-4h-4v2h4v-2zm0-3h-4v2h4v-2z"/></svg>
+        XLSX yuklab olish
+      </button>
+    </div>
     <div class="table-wrap" id="table-wrap-type">
       <div class="loading">Yuklanmoqda...</div>
     </div>
-
     <div class="legend">
       <div class="legend-item">
         <div class="legend-box" style="background:#eef0ff;border:1px solid #c0c8ff"></div>
@@ -229,6 +266,13 @@ fetch('/api/agri-land-tins/cross-matrix')
 fetch('/api/agri-land-tins/cross-matrix-type')
   .then(r => r.json())
   .then(({ categories, map }) => buildTable(categories, map, 'table-wrap-type'));
+
+function downloadXlsx(endpoint, filename) {
+  const a = document.createElement('a');
+  a.href = `/api/agri-land-tins/${endpoint}`;
+  a.download = filename;
+  a.click();
+}
 </script>
 </body>
 </html>
