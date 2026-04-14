@@ -114,6 +114,33 @@ exports.byCategoryCount = async (req, res) => {
   res.json(data);
 };
 
+// Cross matrix — land_fund_category × land_fund_category, qiymat = ikkalasida ham qatnashgan TIN soni
+exports.crossMatrix = async (req, res) => {
+  const data = await AgriLandTin.aggregate([
+    // Har TIN uchun unique categorylar
+    { $project: { cats: { $setUnion: ['$category.land_fund_category'] } } },
+    { $match: { cats: { $ne: [] } } },
+    // catA va catB — ikki marta unwind (cross join)
+    { $project: { catA: '$cats', catB: '$cats' } },
+    { $unwind: '$catA' },
+    { $unwind: '$catB' },
+    { $match: { catA: { $nin: [null, ''] }, catB: { $nin: [null, ''] } } },
+    { $group: { _id: { catA: '$catA', catB: '$catB' }, count: { $sum: 1 } } },
+    { $sort: { '_id.catA': 1, '_id.catB': 1 } },
+  ], { allowDiskUse: true });
+
+  // Barcha categorylarni yig'amiz
+  const catSet = new Set();
+  data.forEach(d => { catSet.add(d._id.catA); catSet.add(d._id.catB); });
+  const categories = [...catSet].sort();
+
+  // Map: catA|catB -> count
+  const map = {};
+  data.forEach(d => { map[`${d._id.catA}|${d._id.catB}`] = d.count; });
+
+  res.json({ categories, map });
+};
+
 // property_kind — category filter bilan
 exports.byPropertyKindCat = async (req, res) => {
   const { category } = req.query;

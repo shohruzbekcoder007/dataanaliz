@@ -19,25 +19,10 @@ async function buildAgriLandTin({ clearFirst = true } = {}) {
   const db = mongoose.connection.db;
   const collection = db.collection('agri_land_full');
 
-  const MATCH_FILTER = {
-    tin:                { $nin: [null, ''] },
-    is_active:          true,
-    removed_by_qx:      false,
-    $expr:              { $ne: [{ $strLenCP: { $ifNull: [{ $toString: '$tin' }, ''] } }, 14] },
-    land_fund_category: { $nin: ['006002', '006007', '006005', '006008', null, ''] },
-    land_fund_type:     {
-      $nin: [
-        '006001007020', '006003006000', '006003002002', '006003001006',
-        '006003001005', '006003003000', '006003001003', '006003001002',
-        '006003002001', '006003001004', '006003002005', '006003004000',
-        '006003002003', '006003001001', '006003002004',
-      ],
-    },
-    property_kind:      { $nin: ['prop_kind_reserve'], $not: /^prop_kind_land_lease/ },
-  };
+  const MATCH_FILTER = { tin: { $nin: [null, ''] } };
 
   const total = await collection.countDocuments(MATCH_FILTER);
-  console.log(`agri_land_full (filtr bilan): ${total.toLocaleString()}`);
+  console.log(`agri_land_full (tin bor): ${total.toLocaleString()}`);
 
   // tin bo'yicha group qilamiz — aggregation bilan
   console.log('Aggregation boshlandi...');
