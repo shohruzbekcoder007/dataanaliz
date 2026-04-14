@@ -114,6 +114,34 @@ exports.byCategoryCount = async (req, res) => {
   res.json(data);
 };
 
+// property_kind — category filter bilan
+exports.byPropertyKindCat = async (req, res) => {
+  const { category } = req.query;
+  const match = category ? { 'category.land_fund_category': category } : {};
+  const data = await AgriLandTin.aggregate([
+    { $match: match },
+    { $unwind: '$category' },
+    ...(category ? [{ $match: { 'category.land_fund_category': category } }] : []),
+    { $group: { _id: '$category.property_kind', count: { $sum: 1 } } },
+    { $sort: { count: -1 } },
+  ]);
+  res.json(data);
+};
+
+// tenancy_type_code — category filter bilan
+exports.byTenancyCat = async (req, res) => {
+  const { category } = req.query;
+  const match = category ? { 'category.land_fund_category': category } : {};
+  const data = await AgriLandTin.aggregate([
+    { $match: match },
+    { $unwind: '$category' },
+    ...(category ? [{ $match: { 'category.land_fund_category': category } }] : []),
+    { $group: { _id: '$category.tenancy_type_code', count: { $sum: 1 } } },
+    { $sort: { count: -1 } },
+  ]);
+  res.json(data);
+};
+
 // tin bo'yicha qidiruv
 exports.getByTin = async (req, res) => {
   const doc = await AgriLandTin.findOne({ tin: req.params.tin }).lean();

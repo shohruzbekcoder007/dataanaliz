@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Land Fund Category — Analiz</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f0f2f5;
+      color: #1a1a2e;
+    }
+
+    header {
+      background: #1a1a2e;
+      color: #fff;
+      padding: 0 32px;
+      display: flex;
+      align-items: center;
+      gap: 32px;
+      height: 54px;
+    }
+    header .brand { font-size: 1rem; font-weight: 700; white-space: nowrap; }
+    nav a {
+      color: rgba(255,255,255,.6);
+      text-decoration: none;
+      font-size: 0.88rem;
+      padding: 6px 12px;
+      border-radius: 6px;
+      transition: background .15s;
+    }
+    nav a:hover, nav a.active { background: rgba(255,255,255,.12); color: #fff; }
+
+    .page { padding: 24px 32px 40px; }
+
+    /* Category cards */
+    .cat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+    .cat-card {
+      background: #fff;
+      border-radius: 10px;
+      padding: 18px 20px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08);
+      cursor: pointer;
+      border: 2px solid transparent;
+      transition: border-color .15s, box-shadow .15s;
+    }
+    .cat-card:hover   { box-shadow: 0 4px 12px rgba(79,110,247,.15); }
+    .cat-card.active  { border-color: #4f6ef7; }
+    .cat-card .code   { font-size: 0.75rem; color: #888; font-weight: 600; letter-spacing: .05em; }
+    .cat-card .name   { font-size: 0.92rem; font-weight: 600; margin: 6px 0 10px; color: #1a1a2e; line-height: 1.35; }
+    .cat-card .count  { font-size: 1.6rem; font-weight: 700; color: #4f6ef7; }
+    .cat-card .label  { font-size: 0.72rem; color: #aaa; margin-top: 2px; }
+
+    /* Detail panel */
+    .detail {
+      background: #fff;
+      border-radius: 10px;
+      padding: 24px 28px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08);
+      display: none;
+      margin-bottom: 32px;
+    }
+    .detail.show { display: block; }
+    .detail h2 { font-size: 1rem; font-weight: 700; margin-bottom: 4px; color: #1a1a2e; }
+    .detail .sub { font-size: 0.82rem; color: #888; margin-bottom: 20px; }
+
+    .detail-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+      gap: 24px;
+    }
+    .chart-wrap h3 { font-size: 0.85rem; color: #555; margin-bottom: 12px; font-weight: 600; }
+
+    /* Type table */
+    .type-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.82rem;
+      margin-top: 4px;
+    }
+    .type-table th {
+      text-align: left;
+      padding: 7px 10px;
+      background: #f5f7ff;
+      color: #555;
+      font-weight: 600;
+      border-bottom: 1px solid #e8ecff;
+    }
+    .type-table td {
+      padding: 7px 10px;
+      border-bottom: 1px solid #f0f0f0;
+      color: #333;
+    }
+    .type-table tr:last-child td { border-bottom: none; }
+    .type-table .bar-cell { width: 120px; }
+    .bar-bg {
+      background: #f0f2f5;
+      border-radius: 3px;
+      height: 8px;
+      overflow: hidden;
+    }
+    .bar-fill { background: #4f6ef7; height: 100%; border-radius: 3px; }
+
+    .loading { color: #aaa; font-size: 0.88rem; padding: 12px 0; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="brand">AgriLandTin</div>
+  <nav>
+    <a href="/">Bosh sahifa</a>
+    <a href="/land-category.html" class="active">Land Category</a>
+  </nav>
+</header>
+
+<div class="page">
+
+  <div id="cat-grid" class="cat-grid">
+    <div class="loading">Yuklanmoqda...</div>
+  </div>
+
+  <!-- Detail panel -->
+  <div id="detail" class="detail">
+    <h2 id="d-title">—</h2>
+    <div class="sub" id="d-sub"></div>
+    <div class="detail-grid">
+      <div class="chart-wrap">
+        <h3>Land Fund Type bo'yicha</h3>
+        <div style="overflow-x:auto">
+          <table class="type-table" id="type-table">
+            <thead><tr><th>Type</th><th>Nomi</th><th class="bar-cell"></th><th style="text-align:right">Soni</th></tr></thead>
+            <tbody id="type-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div>
+        <div class="chart-wrap" style="margin-bottom:28px">
+          <h3>Property Kind bo'yicha</h3>
+          <canvas id="chart-prop" height="180"></canvas>
+        </div>
+        <div class="chart-wrap">
+          <h3>Tenancy Type bo'yicha</h3>
+          <canvas id="chart-tenancy" height="180"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const API = '/api/agri-land-tins';
+const COLORS = ['#4f6ef7','#f7914f','#4fc9f7','#f74f6e','#6ef74f','#f7e14f','#a04ff7','#4ff7a0','#f74fa0','#8f8f8f'];
+
+let propChart = null;
+let tenancyChart = null;
+let activeCard = null;
+
+function fmt(n) { return Number(n).toLocaleString('uz-UZ'); }
+
+async function get(url) {
+  const r = await fetch(url);
+  return r.json();
+}
+
+// Category kartalarini yukla
+get(`${API}/by-category`).then(data => {
+  const grid = document.getElementById('cat-grid');
+  grid.innerHTML = data.map((d, i) => `
+    <div class="cat-card" data-code="${d._id}" onclick="loadDetail('${d._id}', '${(d.description||'').replace(/'/g,"\\'")}', this)">
+      <div class="code">${d._id || 'Noma\'lum'}</div>
+      <div class="name">${d.description || 'Tavsif mavjud emas'}</div>
+      <div class="count">${fmt(d.count)}</div>
+      <div class="label">ta TIN</div>
+    </div>
+  `).join('');
+});
+
+// Category tanlanganda detail panelni yukla
+async function loadDetail(code, description, cardEl) {
+  // Active card
+  if (activeCard) activeCard.classList.remove('active');
+  cardEl.classList.add('active');
+  activeCard = cardEl;
+
+  // Panel
+  const detail = document.getElementById('detail');
+  detail.classList.add('show');
+  document.getElementById('d-title').textContent = `${code} — ${description}`;
+  document.getElementById('d-sub').textContent = 'Yuklanmoqda...';
+  document.getElementById('type-tbody').innerHTML = '';
+
+  const [types, props, tenancies] = await Promise.all([
+    get(`${API}/by-type?category=${code}`),
+    get(`${API}/by-property-kind-cat?category=${code}`),
+    get(`${API}/by-tenancy-cat?category=${code}`),
+  ]);
+
+  const totalType = types.reduce((s, d) => s + d.count, 0);
+  document.getElementById('d-sub').textContent =
+    `Jami: ${fmt(totalType)} ta yozuv · ${types.length} ta land_fund_type`;
+
+  // Type jadvali
+  const maxCount = Math.max(...types.map(d => d.count));
+  document.getElementById('type-tbody').innerHTML = types.map(d => `
+    <tr>
+      <td style="font-family:monospace;white-space:nowrap">${d._id || '—'}</td>
+      <td>${d.description || '—'}</td>
+      <td class="bar-cell">
+        <div class="bar-bg"><div class="bar-fill" style="width:${Math.round(d.count/maxCount*100)}%"></div></div>
+      </td>
+      <td style="text-align:right;font-weight:600">${fmt(d.count)}</td>
+    </tr>
+  `).join('');
+
+  // Property chart
+  if (propChart) propChart.destroy();
+  propChart = new Chart(document.getElementById('chart-prop'), {
+    type: 'doughnut',
+    data: {
+      labels: props.map(d => (d._id||'Noma\'lum').replace('prop_kind_','')),
+      datasets: [{ data: props.map(d => d.count), backgroundColor: COLORS }],
+    },
+    options: {
+      plugins: { legend: { position: 'right', labels: { font: { size: 10 }, boxWidth: 12 } } },
+    },
+  });
+
+  // Tenancy chart
+  if (tenancyChart) tenancyChart.destroy();
+  tenancyChart = new Chart(document.getElementById('chart-tenancy'), {
+    type: 'doughnut',
+    data: {
+      labels: tenancies.map(d => (d._id||'Noma\'lum').replace('tenancy_type_','')),
+      datasets: [{ data: tenancies.map(d => d.count), backgroundColor: COLORS }],
+    },
+    options: {
+      plugins: { legend: { position: 'right', labels: { font: { size: 10 }, boxWidth: 12 } } },
+    },
+  });
+
+  // Scroll to detail
+  detail.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+</script>
+</body>
+</html>

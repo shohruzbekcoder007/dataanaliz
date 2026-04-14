@@ -17,13 +17,22 @@
     header {
       background: #1a1a2e;
       color: #fff;
-      padding: 18px 32px;
+      padding: 0 32px;
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 32px;
+      height: 54px;
     }
-    header h1 { font-size: 1.3rem; font-weight: 600; }
-    header span { font-size: 0.85rem; opacity: 0.6; margin-top: 2px; }
+    header .brand { font-size: 1rem; font-weight: 700; white-space: nowrap; }
+    nav a {
+      color: rgba(255,255,255,.6);
+      text-decoration: none;
+      font-size: 0.88rem;
+      padding: 6px 12px;
+      border-radius: 6px;
+      transition: background .15s;
+    }
+    nav a:hover, nav a.active { background: rgba(255,255,255,.12); color: #fff; }
 
     .stats-bar {
       display: flex;
@@ -127,10 +136,11 @@
 <body>
 
 <header>
-  <div>
-    <h1>AgriLandTin — Analiz paneli</h1>
-    <span>agri_land_tins collection statistikasi</span>
-  </div>
+  <div class="brand">AgriLandTin</div>
+  <nav>
+    <a href="/" class="active">Bosh sahifa</a>
+    <a href="/land-category.html">Land Category</a>
+  </nav>
 </header>
 
 <!-- Statistika kartalar -->
