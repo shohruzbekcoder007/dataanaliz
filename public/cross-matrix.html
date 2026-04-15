@@ -266,6 +266,37 @@
     .btn-export:hover { background: #155e39; }
     .btn-export svg { width: 14px; height: 14px; fill: #fff; }
 
+    /* Geo filter bar */
+    .geo-bar {
+      background: #fff;
+      border-radius: 10px;
+      padding: 14px 22px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+    .geo-bar label { font-size: 0.8rem; color: #666; white-space: nowrap; font-weight: 600; }
+    .geo-bar select {
+      padding: 7px 12px;
+      border: 1px solid #ddd;
+      border-radius: 7px;
+      font-size: 0.85rem;
+      outline: none;
+      min-width: 180px;
+      background: #fafbff;
+    }
+    .geo-bar select:focus { border-color: #4f6ef7; }
+    .geo-bar .geo-sep { color: #bbb; }
+    .geo-crumb {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 0.8rem; color: #888; margin-left: auto;
+    }
+    .geo-crumb span { color: #4f6ef7; font-weight: 600; }
+    .geo-loading { font-size: 0.78rem; color: #aaa; margin-left: 8px; display: none; }
+
     /* Legenda */
     .legend {
       display: flex;
@@ -321,6 +352,25 @@
 </div>
 
 <div class="page">
+
+  <!-- Geo filter -->
+  <div class="geo-bar">
+    <label>Viloyat:</label>
+    <select id="geo-viloyat" onchange="onViloyatChange()">
+      <option value="">— Barcha viloyatlar —</option>
+    </select>
+    <span class="geo-sep">›</span>
+    <label>Tuman:</label>
+    <select id="geo-tuman" onchange="onGeoChange()" disabled>
+      <option value="">— Barcha tumanlar —</option>
+    </select>
+    <span class="geo-loading" id="geo-loading">Yuklanmoqda...</span>
+    <div class="geo-crumb" id="geo-crumb" style="display:none">
+      Filtr: <span id="geo-crumb-text"></span>
+      <button class="btn-clear" style="margin-left:6px" onclick="clearGeo()">✕ Tozalash</button>
+    </div>
+  </div>
+
   <div class="card">
     <div class="card-header">
       <div>
@@ -435,25 +485,122 @@ function fillSelect(selId, categories) {
   });
 }
 
-fetch('/api/agri-land-tins/cross-matrix')
-  .then(r => r.json())
-  .then(({ categories, map }) => {
-    buildTable(categories, map, 'table-wrap', 'land_fund_category');
-    fillSelect('sel-cat-a', categories);
-    fillSelect('sel-cat-b', categories);
+// Geo filter holati
+let geoState = { viloyat: '', tuman: '' };
+
+function geoParams() {
+  const p = new URLSearchParams();
+  if (geoState.viloyat) p.set('viloyat', geoState.viloyat);
+  if (geoState.tuman)   p.set('tuman',   geoState.tuman);
+  return p.toString() ? '?' + p.toString() : '';
+}
+
+function loadMatrices() {
+  const geo = geoParams();
+  const loading = '<div class="loading">Yuklanmoqda...</div>';
+  document.getElementById('table-wrap').innerHTML      = loading;
+  document.getElementById('table-wrap-type').innerHTML = loading;
+
+  // sel-cat va sel-type larni tozala
+  ['sel-cat-a','sel-cat-b','sel-type-a','sel-type-b'].forEach(id => {
+    const el = document.getElementById(id);
+    el.innerHTML = '<option value="">— tanlang —</option>';
   });
 
-fetch('/api/agri-land-tins/cross-matrix-type')
+  fetch('/api/agri-land-tins/cross-matrix' + geo)
+    .then(r => r.json())
+    .then(({ categories, map }) => {
+      buildTable(categories, map, 'table-wrap', 'land_fund_category');
+      fillSelect('sel-cat-a', categories);
+      fillSelect('sel-cat-b', categories);
+    });
+
+  fetch('/api/agri-land-tins/cross-matrix-type' + geo)
+    .then(r => r.json())
+    .then(({ categories, map }) => {
+      buildTable(categories, map, 'table-wrap-type', 'land_fund_type');
+      fillSelect('sel-type-a', categories);
+      fillSelect('sel-type-b', categories);
+    });
+}
+
+// Viloyat tanlanganda tumanlarni yukla
+async function onViloyatChange() {
+  const viloyat = document.getElementById('geo-viloyat').value;
+  const tumanSel = document.getElementById('geo-tuman');
+  tumanSel.innerHTML = '<option value="">— Barcha tumanlar —</option>';
+  tumanSel.disabled = !viloyat;
+  geoState.viloyat = viloyat;
+  geoState.tuman   = '';
+
+  if (viloyat) {
+    const data = await fetch(`/api/agri-land-tins/geo/tumans?viloyat=${viloyat}`).then(r => r.json());
+    data.forEach(d => {
+      const o = document.createElement('option');
+      o.value = d._id;
+      o.textContent = `${d._id} — ${d.name || ''}`;
+      tumanSel.appendChild(o);
+    });
+  }
+  updateGeoCrumb();
+  loadMatrices();
+}
+
+function onGeoChange() {
+  geoState.tuman = document.getElementById('geo-tuman').value;
+  updateGeoCrumb();
+  loadMatrices();
+}
+
+function clearGeo() {
+  geoState = { viloyat: '', tuman: '' };
+  document.getElementById('geo-viloyat').value = '';
+  document.getElementById('geo-tuman').innerHTML = '<option value="">— Barcha tumanlar —</option>';
+  document.getElementById('geo-tuman').disabled = true;
+  updateGeoCrumb();
+  loadMatrices();
+}
+
+function updateGeoCrumb() {
+  const crumb = document.getElementById('geo-crumb');
+  const txt   = document.getElementById('geo-crumb-text');
+  if (!geoState.viloyat && !geoState.tuman) {
+    crumb.style.display = 'none';
+    return;
+  }
+  const parts = [];
+  if (geoState.viloyat) {
+    const opt = document.querySelector(`#geo-viloyat option[value="${geoState.viloyat}"]`);
+    parts.push(opt ? opt.textContent : geoState.viloyat);
+  }
+  if (geoState.tuman) {
+    const opt = document.querySelector(`#geo-tuman option[value="${geoState.tuman}"]`);
+    parts.push(opt ? opt.textContent : geoState.tuman);
+  }
+  txt.textContent = parts.join(' › ');
+  crumb.style.display = 'flex';
+}
+
+// Viloyatlarni yukla
+fetch('/api/agri-land-tins/geo/viloyats')
   .then(r => r.json())
-  .then(({ categories, map }) => {
-    buildTable(categories, map, 'table-wrap-type', 'land_fund_type');
-    fillSelect('sel-type-a', categories);
-    fillSelect('sel-type-b', categories);
+  .then(data => {
+    const sel = document.getElementById('geo-viloyat');
+    data.forEach(d => {
+      const o = document.createElement('option');
+      o.value = d._id;
+      o.textContent = `${d._id} — ${d.name || ''}`;
+      sel.appendChild(o);
+    });
   });
+
+// Dastlabki yuklanish
+loadMatrices();
 
 function downloadXlsx(endpoint, filename) {
+  const geo = geoParams();
   const a = document.createElement('a');
-  a.href = `/api/agri-land-tins/${endpoint}`;
+  a.href = `/api/agri-land-tins/${endpoint}${geo}`;
   a.download = filename;
   a.click();
 }
@@ -469,7 +616,8 @@ function showTins(field, a, b, count) {
   document.getElementById('modal-areas').style.display = 'none';
   document.getElementById('modal-overlay').classList.add('show');
 
-  fetch(`/api/agri-land-tins/tin-list?field=${field}&a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}`)
+  const geoQ = geoParams() ? '&' + geoParams().slice(1) : '';
+  fetch(`/api/agri-land-tins/tin-list?field=${field}&a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}${geoQ}`)
     .then(r => r.json())
     .then(({ tins, count: total, areas, tinAreas }) => {
       document.getElementById('modal-sub').textContent = `Jami: ${total.toLocaleString('uz-UZ')} ta TIN`;

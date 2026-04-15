@@ -115,9 +115,23 @@ exports.byCategoryCount = async (req, res) => {
   res.json(data);
 };
 
+// Geo filter yordamida TINlar ro'yxatini oladi
+async function getTinsByGeo({ viloyat_code, tuman_code } = {}) {
+  if (!viloyat_code && !tuman_code) return null;
+  const col = require('mongoose').connection.db.collection('agri_land_full');
+  const match = { tin: { $nin: [null, ''] } };
+  if (viloyat_code) match.viloyat_code = viloyat_code;
+  if (tuman_code)   match.tuman_code   = tuman_code;
+  return col.distinct('tin', match);
+}
+
 // Cross matrix — umumiy helper
-async function buildCrossMatrix(field) {
+async function buildCrossMatrix(field, geoFilter = {}) {
+  const tinFilter = await getTinsByGeo(geoFilter);
+  const preMatch  = tinFilter ? { $match: { tin: { $in: tinFilter } } } : { $match: {} };
+
   const data = await AgriLandTin.aggregate([
+    preMatch,
     { $project: { cats: { $setUnion: [`$category.${field}`] } } },
     { $match: { cats: { $ne: [] } } },
     { $project: { catA: '$cats', catB: '$cats' } },
@@ -138,14 +152,41 @@ async function buildCrossMatrix(field) {
 
 // Cross matrix — land_fund_category × land_fund_category
 exports.crossMatrix = async (req, res) => {
-  const result = await buildCrossMatrix('land_fund_category');
+  const { viloyat, tuman } = req.query;
+  const result = await buildCrossMatrix('land_fund_category', { viloyat_code: viloyat, tuman_code: tuman });
   res.json(result);
 };
 
 // Cross matrix — land_fund_type × land_fund_type
 exports.crossMatrixType = async (req, res) => {
-  const result = await buildCrossMatrix('land_fund_type');
+  const { viloyat, tuman } = req.query;
+  const result = await buildCrossMatrix('land_fund_type', { viloyat_code: viloyat, tuman_code: tuman });
   res.json(result);
+};
+
+// Viloyatlar ro'yxati
+exports.getViloyats = async (req, res) => {
+  const col = require('mongoose').connection.db.collection('agri_land_full');
+  const data = await col.aggregate([
+    { $match: { viloyat_code: { $nin: [null, ''] } } },
+    { $group: { _id: '$viloyat_code', name: { $first: '$viloyat_name' } } },
+    { $sort: { _id: 1 } },
+  ]).toArray();
+  res.json(data);
+};
+
+// Tumanlar ro'yxati — ixtiyoriy viloyat filteri bilan
+exports.getTumans = async (req, res) => {
+  const { viloyat } = req.query;
+  const col = require('mongoose').connection.db.collection('agri_land_full');
+  const match = { tuman_code: { $nin: [null, ''] } };
+  if (viloyat) match.viloyat_code = viloyat;
+  const data = await col.aggregate([
+    { $match: match },
+    { $group: { _id: '$tuman_code', name: { $first: '$tuman_name' } } },
+    { $sort: { _id: 1 } },
+  ]).toArray();
+  res.json(data);
 };
 
 // XLSX export helper
@@ -193,27 +234,39 @@ function matrixToXlsx({ categories, map }, sheetName) {
 // Yacheyka bosilganda — ikkala qiymatga ega TINlar ro'yxati + maydon summasi
 // GET /tin-list?field=land_fund_category&a=006001&b=006003
 exports.tinList = async (req, res) => {
-  const { field = 'land_fund_category', a, b } = req.query;
+  const { field = 'land_fund_category', a, b, viloyat, tuman } = req.query;
   if (!a || !b) return res.status(400).json({ message: 'a va b parametrlari kerak' });
 
   const matchField = `category.${field}`;
 
-  // TINlar ro'yxati
-  const tinDocs = a === b
-    ? await AgriLandTin.find({ [matchField]: a }, { tin: 1 }).lean()
-    : await AgriLandTin.find({ [matchField]: { $all: [a, b] } }, { tin: 1 }).lean();
+  // TINlar ro'yxati (agri_land_tins dan)
+  let tinQuery = a === b
+    ? { [matchField]: a }
+    : { [matchField]: { $all: [a, b] } };
 
+  // Geo filter bo'lsa — agri_land_full dan mos TINlarni olamiz
+  if (viloyat || tuman) {
+    const geoTins = await getTinsByGeo({ viloyat_code: viloyat, tuman_code: tuman });
+    tinQuery = { ...tinQuery, tin: { $in: geoTins } };
+  }
+
+  const tinDocs = await AgriLandTin.find(tinQuery, { tin: 1 }).lean();
   const tins = tinDocs.map(d => d.tin).filter(Boolean);
 
   // agri_land_full dan: tin + field bo'yicha area va cadastral_number soni
   const col = require('mongoose').connection.db.collection('agri_land_full');
 
   const values = a === b ? [a] : [a, b];
+  const geoMatch = {};
+  if (viloyat) geoMatch.viloyat_code = viloyat;
+  if (tuman)   geoMatch.tuman_code   = tuman;
+
   const areaAgg = await col.aggregate([
     {
       $match: {
         tin: { $in: tins },
         [field]: { $in: values },
+        ...geoMatch,
       },
     },
     {
@@ -277,7 +330,8 @@ exports.tinList = async (req, res) => {
 
 // Export — land_fund_category
 exports.exportCrossMatrix = async (req, res) => {
-  const result = await buildCrossMatrix('land_fund_category');
+  const { viloyat, tuman } = req.query;
+  const result = await buildCrossMatrix('land_fund_category', { viloyat_code: viloyat, tuman_code: tuman });
   const buf    = matrixToXlsx(result, 'Category');
   res.setHeader('Content-Disposition', 'attachment; filename="land_fund_category_matrix.xlsx"');
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -286,7 +340,8 @@ exports.exportCrossMatrix = async (req, res) => {
 
 // Export — land_fund_type
 exports.exportCrossMatrixType = async (req, res) => {
-  const result = await buildCrossMatrix('land_fund_type');
+  const { viloyat, tuman } = req.query;
+  const result = await buildCrossMatrix('land_fund_type', { viloyat_code: viloyat, tuman_code: tuman });
   const buf    = matrixToXlsx(result, 'Type');
   res.setHeader('Content-Disposition', 'attachment; filename="land_fund_type_matrix.xlsx"');
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');

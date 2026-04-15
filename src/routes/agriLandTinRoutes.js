@@ -33,6 +33,10 @@ router.get('/cross-matrix-type/export',  ctrl.exportCrossMatrixType);
 router.get('/by-property-kind-cat', ctrl.byPropertyKindCat);
 router.get('/by-tenancy-cat',       ctrl.byTenancyCat);
 
+// Geo — viloyat va tuman ro'yxatlari
+router.get('/geo/viloyats',         ctrl.getViloyats);
+router.get('/geo/tumans',           ctrl.getTumans);
+
 // Qidiruv — tin bo'yicha
 router.get('/tin/:tin',             ctrl.getByTin);
 
