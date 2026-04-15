@@ -631,7 +631,9 @@ function showTins(field, a, b, count) {
         document.getElementById(labelId).textContent = key;
         document.getElementById(valId).textContent   = d ? `${Number(d.area).toLocaleString('uz-UZ')} ga` : '—';
         document.getElementById(countId).textContent = d
-          ? `${d.cadastral_count.toLocaleString('uz-UZ')} ta yozuv · ${d.unique_cadastral.toLocaleString('uz-UZ')} unique kadastr`
+          ? (d.cadastral_count === d.unique_cadastral
+              ? `${d.cadastral_count.toLocaleString('uz-UZ')} ta kadastr`
+              : `${d.unique_cadastral.toLocaleString('uz-UZ')} ta kadastr · ${d.cadastral_count.toLocaleString('uz-UZ')} yozuv`)
           : 'topilmadi';
         document.getElementById(elId).style.display = 'block';
       }
