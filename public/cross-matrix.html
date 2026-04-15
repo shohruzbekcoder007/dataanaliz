@@ -198,6 +198,25 @@
       background: #fff8ec; color: #a05a00; border: 1px solid #ffe5b0;
       white-space: nowrap;
     }
+    /* Modal header — 6-shakil summary */
+    .six-summary {
+      display: none;
+      margin-top: 10px;
+      background: #fffbf2;
+      border: 1px solid #ffe5b0;
+      border-radius: 8px;
+      padding: 10px 14px;
+    }
+    .six-summary-title {
+      font-size: 0.72rem; font-weight: 700; color: #a05a00;
+      margin-bottom: 8px; letter-spacing: .04em;
+    }
+    .six-summary-grid {
+      display: flex; gap: 16px; flex-wrap: wrap;
+    }
+    .six-stat { min-width: 120px; }
+    .six-stat-label { font-size: 0.68rem; color: #aaa; margin-bottom: 1px; }
+    .six-stat-val   { font-size: 0.95rem; font-weight: 700; color: #a05a00; }
     .modal-empty { text-align: center; padding: 32px; color: #bbb; font-size: 0.88rem; }
     td.cell { cursor: pointer; }
     td.cell:hover { filter: brightness(0.93); }
@@ -348,6 +367,32 @@
               <div style="font-size:0.72rem;color:#888;font-weight:600" id="area-b-label"></div>
               <div style="font-size:1.1rem;font-weight:700;color:#1a7a4a;margin-top:2px" id="area-b-val">—</div>
               <div style="font-size:0.72rem;color:#aaa" id="area-b-count"></div>
+            </div>
+          </div>
+        </div>
+        <!-- 6-shakil umumiy -->
+        <div class="six-summary" id="six-summary">
+          <div class="six-summary-title">6-SHAKIL — UMUMIY YIG'INDI</div>
+          <div class="six-summary-grid">
+            <div class="six-stat">
+              <div class="six-stat-label">Jami yer maydoni</div>
+              <div class="six-stat-val" id="six-total">—</div>
+            </div>
+            <div class="six-stat">
+              <div class="six-stat-label">Qishloq xo'jaligi</div>
+              <div class="six-stat-val" id="six-agri">—</div>
+            </div>
+            <div class="six-stat">
+              <div class="six-stat-label">Haydalma</div>
+              <div class="six-stat-val" id="six-arable">—</div>
+            </div>
+            <div class="six-stat">
+              <div class="six-stat-label">Ekin maydoni</div>
+              <div class="six-stat-val" id="six-sown">—</div>
+            </div>
+            <div class="six-stat">
+              <div class="six-stat-label">Issiqxona</div>
+              <div class="six-stat-val" id="six-green">—</div>
             </div>
           </div>
         </div>
@@ -623,6 +668,7 @@ function showTins(field, a, b, count) {
   document.getElementById('modal-sub').textContent = 'Yuklanmoqda...';
   document.getElementById('modal-body').innerHTML = '<div class="modal-empty">Yuklanmoqda...</div>';
   document.getElementById('modal-areas').style.display = 'none';
+  document.getElementById('six-summary').style.display = 'none';
   document.getElementById('modal-overlay').classList.add('show');
 
   const geoQ = geoParams() ? '&' + geoParams().slice(1) : '';
@@ -653,6 +699,25 @@ function showTins(field, a, b, count) {
         fillArea('area-b', 'area-b-label', 'area-b-val', 'area-b-count', b);
       } else {
         bEl.style.display = 'none';
+      }
+
+      // 6-shakil umumiy yig'indi
+      if (sixMap && Object.keys(sixMap).length) {
+        const tot = { total_land_area: 0, agricultural_land_total: 0, arable_land: 0, sown_area: 0, greenhouse_land_area: 0 };
+        Object.values(sixMap).forEach(s => {
+          tot.total_land_area         += s.total_land_area         || 0;
+          tot.agricultural_land_total += s.agricultural_land_total || 0;
+          tot.arable_land             += s.arable_land             || 0;
+          tot.sown_area               += s.sown_area               || 0;
+          tot.greenhouse_land_area    += s.greenhouse_land_area     || 0;
+        });
+        const g = v => v ? `${Number(v.toFixed(2)).toLocaleString('uz-UZ')} ga` : '—';
+        document.getElementById('six-total').textContent  = g(tot.total_land_area);
+        document.getElementById('six-agri').textContent   = g(tot.agricultural_land_total);
+        document.getElementById('six-arable').textContent = g(tot.arable_land);
+        document.getElementById('six-sown').textContent   = g(tot.sown_area);
+        document.getElementById('six-green').textContent  = g(tot.greenhouse_land_area);
+        document.getElementById('six-summary').style.display = 'block';
       }
 
       if (!tins.length) {
