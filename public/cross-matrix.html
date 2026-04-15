@@ -134,9 +134,9 @@
     .modal {
       background: #fff;
       border-radius: 12px;
-      width: 480px;
-      max-width: 95vw;
-      max-height: 80vh;
+      width: 820px;
+      max-width: 96vw;
+      max-height: 85vh;
       display: flex;
       flex-direction: column;
       box-shadow: 0 8px 32px rgba(0,0,0,.18);
@@ -167,8 +167,12 @@
       flex: 1;
     }
     .tin-item {
-      padding: 7px 0;
+      padding: 7px 0 7px 0;
       border-bottom: 1px solid #f2f2f2;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
       font-size: 0.88rem;
       color: #1a1a2e;
       display: flex;
@@ -176,7 +180,15 @@
       gap: 10px;
     }
     .tin-item:last-child { border-bottom: none; }
-    .tin-num { color: #aaa; font-size: 0.75rem; min-width: 28px; }
+    .tin-num { color: #aaa; font-size: 0.75rem; min-width: 28px; flex-shrink: 0; }
+    .tin-code { font-family: monospace; font-size: 0.85rem; font-weight: 600; flex: 1; min-width: 100px; }
+    .tin-badge {
+      font-size: 0.72rem; border-radius: 5px; padding: 2px 8px;
+      white-space: nowrap; line-height: 1.6;
+    }
+    .tin-badge-a { background: #eef0ff; color: #4f6ef7; }
+    .tin-badge-b { background: #edfff5; color: #1a7a4a; }
+    .tin-badge-same { background: #eef0ff; color: #4f6ef7; }
     .modal-empty { text-align: center; padding: 32px; color: #bbb; font-size: 0.88rem; }
     td.cell { cursor: pointer; }
     td.cell:hover { filter: brightness(0.93); }
@@ -459,7 +471,7 @@ function showTins(field, a, b, count) {
 
   fetch(`/api/agri-land-tins/tin-list?field=${field}&a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}`)
     .then(r => r.json())
-    .then(({ tins, count: total, areas }) => {
+    .then(({ tins, count: total, areas, tinAreas }) => {
       document.getElementById('modal-sub').textContent = `Jami: ${total.toLocaleString('uz-UZ')} ta TIN`;
 
       // Maydon summasi
@@ -488,9 +500,23 @@ function showTins(field, a, b, count) {
         document.getElementById('modal-body').innerHTML = '<div class="modal-empty">TIN topilmadi</div>';
         return;
       }
-      document.getElementById('modal-body').innerHTML = tins.map((tin, i) =>
-        `<div class="tin-item"><span class="tin-num">${i + 1}</span>${tin}</div>`
-      ).join('');
+      const isSame = a === b;
+      document.getElementById('modal-body').innerHTML = tins.map((tin, i) => {
+        const td = (tinAreas || {})[tin] || {};
+        const da = td[a];
+        const db = td[b];
+        const badgeA = da
+          ? `<span class="tin-badge ${isSame ? 'tin-badge-same' : 'tin-badge-a'}">${a}: ${Number(da.area).toLocaleString('uz-UZ')} ga · ${da.count} kadastr</span>`
+          : '';
+        const badgeB = (!isSame && db)
+          ? `<span class="tin-badge tin-badge-b">${b}: ${Number(db.area).toLocaleString('uz-UZ')} ga · ${db.count} kadastr</span>`
+          : '';
+        return `<div class="tin-item">
+          <span class="tin-num">${i + 1}</span>
+          <span class="tin-code">${tin}</span>
+          ${badgeA}${badgeB}
+        </div>`;
+      }).join('');
     });
 }
 

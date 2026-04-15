@@ -240,7 +240,39 @@ exports.tinList = async (req, res) => {
     };
   });
 
-  res.json({ a, b, field, count: tins.length, tins, areas });
+  // Har bir TIN uchun alohida area (tin × field_value bo'yicha)
+  const tinAreaAgg = await col.aggregate([
+    {
+      $match: {
+        tin:    { $in: tins },
+        [field]: { $in: values },
+      },
+    },
+    {
+      $group: {
+        _id: { tin: '$tin', val: `$${field}` },
+        area_sum: {
+          $sum: {
+            $convert: { input: '$gis_area_ha', to: 'double', onError: 0, onNull: 0 },
+          },
+        },
+        cadastral_count: { $sum: 1 },
+      },
+    },
+    { $sort: { '_id.tin': 1, '_id.val': 1 } },
+  ], { allowDiskUse: true }).toArray();
+
+  // { "200011130": { "006008000000": { area, count }, ... }, ... }
+  const tinAreas = {};
+  tinAreaAgg.forEach(r => {
+    if (!tinAreas[r._id.tin]) tinAreas[r._id.tin] = {};
+    tinAreas[r._id.tin][r._id.val] = {
+      area:  +r.area_sum.toFixed(4),
+      count: r.cadastral_count,
+    };
+  });
+
+  res.json({ a, b, field, count: tins.length, tins, areas, tinAreas });
 };
 
 // Export — land_fund_category
