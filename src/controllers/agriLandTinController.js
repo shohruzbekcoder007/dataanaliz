@@ -325,7 +325,38 @@ exports.tinList = async (req, res) => {
     };
   });
 
-  res.json({ a, b, field, count: tins.length, tins, areas, tinAreas });
+  // SixShape dan har bir TIN uchun yig'indi (organization_inn = TIN raqami)
+  const sixCol = require('mongoose').connection.db.collection('six_shapes');
+  const tinNums = tins.map(t => parseInt(t, 10)).filter(n => !isNaN(n));
+
+  const sixAgg = await sixCol.aggregate([
+    { $match: { organization_inn: { $in: tinNums } } },
+    {
+      $group: {
+        _id:                     '$organization_inn',
+        total_land_area:         { $sum: { $ifNull: ['$total_land_area', 0] } },
+        agricultural_land_total: { $sum: { $ifNull: ['$agricultural_land_total', 0] } },
+        arable_land:             { $sum: { $ifNull: ['$arable_land', 0] } },
+        sown_area:               { $sum: { $ifNull: ['$sown_area', 0] } },
+        greenhouse_land_area:    { $sum: { $ifNull: ['$greenhouse_land_area', 0] } },
+        record_count:            { $sum: 1 },
+      },
+    },
+  ], { allowDiskUse: true }).toArray();
+
+  const sixMap = {};
+  sixAgg.forEach(r => {
+    sixMap[String(r._id)] = {
+      total_land_area:         +r.total_land_area.toFixed(4),
+      agricultural_land_total: +r.agricultural_land_total.toFixed(4),
+      arable_land:             +r.arable_land.toFixed(4),
+      sown_area:               +r.sown_area.toFixed(4),
+      greenhouse_land_area:    +r.greenhouse_land_area.toFixed(4),
+      record_count:            r.record_count,
+    };
+  });
+
+  res.json({ a, b, field, count: tins.length, tins, areas, tinAreas, sixMap });
 };
 
 // Export — land_fund_category

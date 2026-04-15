@@ -189,6 +189,15 @@
     .tin-badge-a { background: #eef0ff; color: #4f6ef7; }
     .tin-badge-b { background: #edfff5; color: #1a7a4a; }
     .tin-badge-same { background: #eef0ff; color: #4f6ef7; }
+    .six-row {
+      display: flex; gap: 6px; flex-wrap: wrap;
+      margin-top: 4px; width: 100%;
+    }
+    .six-chip {
+      font-size: 0.68rem; padding: 2px 7px; border-radius: 4px;
+      background: #fff8ec; color: #a05a00; border: 1px solid #ffe5b0;
+      white-space: nowrap;
+    }
     .modal-empty { text-align: center; padding: 32px; color: #bbb; font-size: 0.88rem; }
     td.cell { cursor: pointer; }
     td.cell:hover { filter: brightness(0.93); }
@@ -619,7 +628,7 @@ function showTins(field, a, b, count) {
   const geoQ = geoParams() ? '&' + geoParams().slice(1) : '';
   fetch(`/api/agri-land-tins/tin-list?field=${field}&a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}${geoQ}`)
     .then(r => r.json())
-    .then(({ tins, count: total, areas, tinAreas }) => {
+    .then(({ tins, count: total, areas, tinAreas, sixMap }) => {
       document.getElementById('modal-sub').textContent = `Jami: ${total.toLocaleString('uz-UZ')} ta TIN`;
 
       // Maydon summasi
@@ -661,10 +670,22 @@ function showTins(field, a, b, count) {
         const badgeB = (!isSame && db)
           ? `<span class="tin-badge tin-badge-b">${Number(db.area).toLocaleString('uz-UZ')} ga · ${db.count} kadastr</span>`
           : '';
+        const six = (sixMap || {})[tin];
+        const sixRow = six ? (() => {
+          const chips = [];
+          const f = (v, label) => v ? `<span class="six-chip">${label}: ${Number(v).toLocaleString('uz-UZ')} ga</span>` : '';
+          chips.push(f(six.total_land_area,         'Jami'));
+          chips.push(f(six.agricultural_land_total, 'Qishloq xo\'jaligi'));
+          chips.push(f(six.arable_land,             'Haydalma'));
+          chips.push(f(six.sown_area,               'Ekin'));
+          chips.push(f(six.greenhouse_land_area,    'Issiqxona'));
+          return `<div class="six-row">${chips.filter(Boolean).join('')}</div>`;
+        })() : '';
         return `<div class="tin-item">
           <span class="tin-num">${i + 1}</span>
           <span class="tin-code">${tin}</span>
           ${badgeA}${badgeB}
+          ${sixRow}
         </div>`;
       }).join('');
     });
