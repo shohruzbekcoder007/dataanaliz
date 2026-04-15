@@ -506,10 +506,10 @@ function showTins(field, a, b, count) {
         const da = td[a];
         const db = td[b];
         const badgeA = da
-          ? `<span class="tin-badge ${isSame ? 'tin-badge-same' : 'tin-badge-a'}">${a}: ${Number(da.area).toLocaleString('uz-UZ')} ga · ${da.count} kadastr</span>`
+          ? `<span class="tin-badge ${isSame ? 'tin-badge-same' : 'tin-badge-a'}">${Number(da.area).toLocaleString('uz-UZ')} ga · ${da.count} kadastr</span>`
           : '';
         const badgeB = (!isSame && db)
-          ? `<span class="tin-badge tin-badge-b">${b}: ${Number(db.area).toLocaleString('uz-UZ')} ga · ${db.count} kadastr</span>`
+          ? `<span class="tin-badge tin-badge-b">${Number(db.area).toLocaleString('uz-UZ')} ga · ${db.count} kadastr</span>`
           : '';
         return `<div class="tin-item">
           <span class="tin-num">${i + 1}</span>
