@@ -13,10 +13,15 @@ const FILES = [
   //   sheetName: 'Kobo_2',
   //   sourceName: 'kobo_2',
   // },
+  // {
+  //   filePath: path.join(__dirname, '../../Kobo_3.xlsx'),
+  //   sheetName: 'kobo_3',
+  //   sourceName: 'kobo_3',
+  // },
   {
-    filePath: path.join(__dirname, '../../Kobo_3.xlsx'),
-    sheetName: 'kobo_3',
-    sourceName: 'kobo_3',
+    filePath: path.join(__dirname, '../../kobo_4.xlsx'),
+    sheetName: 'kobo_agri_parcels',
+    sourceName: 'kobo_4',
   },
 ];
 
@@ -40,6 +45,9 @@ function readXlsx(filePath, sheetName, sourceName) {
     mahalla_tin: row.mahalla_tin ? String(row.mahalla_tin) : null,
     mahalla_name: row.mahalla_name || null,
     mahalla_uz: row.mahalla_uz || null,
+    viloyat_code: row.viloyat_code != null ? Number(row.viloyat_code) : null,
+    tuman_code:   row.tuman_code   != null ? Number(row.tuman_code)   : null,
+    tuman_name:   row.tuman_name   || null,
     area_ha: row.area_ha != null ? Number(row.area_ha) : null,
     crop_year: row.crop_year ? String(row.crop_year) : null,
     crop_type: row.crop_type || null,
@@ -48,7 +56,10 @@ function readXlsx(filePath, sheetName, sourceName) {
     land_fund_category_code: row.land_fund_category_code
       ? String(row.land_fund_category_code)
       : null,
-    kobo_time_number: row.kobo_time_number != null ? Number(row.kobo_time_number) : null,
+    // kobo_4 da kobo_version, boshqalarda kobo_time_number
+    kobo_time_number: row.kobo_time_number != null
+      ? Number(row.kobo_time_number)
+      : (row.kobo_version != null ? Number(row.kobo_version) : null),
     source_file: sourceName,
   }));
 }

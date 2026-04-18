@@ -6,6 +6,9 @@ const koboRecordSchema = new mongoose.Schema(
     mahalla_tin:             { type: String, default: null },
     mahalla_name:            { type: String, default: null },   // kobo_2 field
     mahalla_uz:              { type: String, default: null },   // kobo_1 field
+    viloyat_code:            { type: Number, default: null },   // kobo_4 field
+    tuman_code:              { type: Number, default: null },   // kobo_4 field
+    tuman_name:              { type: String, default: null },   // kobo_4 field
     area_ha:                 { type: Number, default: null },
     crop_year:               { type: String, default: null },
     crop_type:               { type: String, default: null },
