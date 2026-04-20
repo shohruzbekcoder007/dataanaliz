@@ -127,6 +127,8 @@
 
   <div class="stats-bar">
     <div>Jami: <b id="total-count">—</b></div>
+    <div>Kadastr topildi: <b id="found-count" style="color:#1a7a4a">—</b></div>
+    <div>Kadastr topilmadi: <b id="notfound-count" style="color:#c0392b">—</b></div>
     <div>Sahifa: <b id="page-info">—</b></div>
   </div>
 
@@ -245,6 +247,8 @@ async function loadList() {
   state.pages = data.pages;
 
   document.getElementById('total-count').textContent = fmt(data.total);
+  document.getElementById('found-count').textContent = fmt(data.found_count);
+  document.getElementById('notfound-count').textContent = fmt(data.not_found_count);
   document.getElementById('page-info').textContent = `${data.page} / ${data.pages || 1}`;
   document.getElementById('total-pages').textContent = data.pages || 1;
   document.getElementById('page-input').value = data.page;

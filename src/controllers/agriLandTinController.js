@@ -433,7 +433,7 @@ exports.sixShapesList = async (req, res) => {
     match.soato = { $gte: v * 1000, $lt: (v + 1) * 1000 };
   }
 
-  const [total, items] = await Promise.all([
+  const [total, items, allSixTins] = await Promise.all([
     sixCol.countDocuments(match),
     sixCol.find(match)
       .project({
@@ -454,6 +454,7 @@ exports.sixShapesList = async (req, res) => {
       .skip(skip)
       .limit(limit)
       .toArray(),
+    sixCol.distinct('organization_inn', match),
   ]);
 
   // Joriy sahifadagi TINlar bo'yicha AgriLandFull dan kontur soni land_fund_type bo'yicha
@@ -463,6 +464,20 @@ exports.sixShapesList = async (req, res) => {
   const geoMatch = {};
   if (viloyat) geoMatch.viloyat_code = String(viloyat);
   if (tuman)   geoMatch.tuman_code   = String(tuman);
+
+  // Butun filterga mos SixShape TINlari ichidan — AgriLandFull da kadastri topilganlar
+  const allSixTinsStr = allSixTins.filter(Boolean).map(String);
+  const matchedTinsArr = await aglCol.distinct('tin', {
+    tin: { $in: allSixTinsStr },
+    ...geoMatch,
+  });
+  const matchedSet = new Set(matchedTinsArr);
+  // Topilgan va topilmagan sixShape yozuvlari soni
+  const foundCount = await sixCol.countDocuments({
+    ...match,
+    organization_inn: { $in: matchedTinsArr.map(t => Number(t)).filter(n => !isNaN(n)) },
+  });
+  const notFoundCount = total - foundCount;
 
   const contours = await aglCol.aggregate([
     { $match: { tin: { $in: tins }, ...geoMatch } },
@@ -501,6 +516,8 @@ exports.sixShapesList = async (req, res) => {
   res.json({
     total, page, limit,
     pages: Math.ceil(total / limit),
+    found_count: foundCount,
+    not_found_count: notFoundCount,
     items: enriched,
   });
 };
