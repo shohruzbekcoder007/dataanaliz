@@ -1,5 +1,5 @@
 /**
- * shakil5.xlsx ni five_shapes collectionga import qiladi.
+ * shakl5.xlsx ni five_shapes collectionga import qiladi.
  * Ishga tushirish: node import_five_shapes.js
  * Tozalab qayta yozish: node import_five_shapes.js --clear
  */

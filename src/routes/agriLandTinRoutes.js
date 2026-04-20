@@ -37,7 +37,7 @@ router.get('/by-tenancy-cat',       ctrl.byTenancyCat);
 router.get('/geo/viloyats',         ctrl.getViloyats);
 router.get('/geo/tumans',           ctrl.getTumans);
 
-// 6-shakil ro'yxati pagination bilan
+// 6-shakl ro'yxati pagination bilan
 router.get('/six-shapes',           ctrl.sixShapesList);
 
 // Qidiruv — tin bo'yicha

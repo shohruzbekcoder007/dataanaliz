@@ -2,7 +2,7 @@ const XLSX = require('xlsx');
 const path = require('path');
 const FiveShapes = require('../models/FiveShapes');
 
-const FILE_PATH  = path.join(__dirname, '../../shakil5.xlsx');
+const FILE_PATH  = path.join(__dirname, '../../shakl5.xlsx');
 const SHEET_NAME = 'Лист1';
 const BATCH_SIZE = 200;
 
