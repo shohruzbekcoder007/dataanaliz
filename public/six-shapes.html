@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>6-Shakil ro'yxati</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f2f5; color: #1a1a2e; }
+
+    header {
+      background: #1a1a2e; color: #fff; padding: 0 32px;
+      display: flex; align-items: center; gap: 32px; height: 54px;
+    }
+    header .brand { font-size: 1rem; font-weight: 700; }
+    nav a {
+      color: rgba(255,255,255,.6); text-decoration: none;
+      font-size: 0.88rem; padding: 6px 12px; border-radius: 6px;
+    }
+    nav a:hover, nav a.active { background: rgba(255,255,255,.12); color: #fff; }
+
+    .page { padding: 24px 32px 40px; }
+
+    .geo-bar {
+      background: #fff; border-radius: 10px; padding: 14px 22px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08);
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+    .geo-bar label { font-size: 0.8rem; color: #666; font-weight: 600; }
+    .geo-bar select {
+      padding: 7px 12px; border: 1px solid #ddd; border-radius: 7px;
+      font-size: 0.85rem; min-width: 200px; background: #fafbff;
+    }
+    .geo-bar select:focus { border-color: #4f6ef7; outline: none; }
+    .geo-sep { color: #bbb; }
+    .btn-clear {
+      padding: 7px 14px; background: #f0f2f5; color: #666;
+      border: none; border-radius: 7px; font-size: 0.85rem; cursor: pointer;
+    }
+    .btn-clear:hover { background: #e0e4ec; }
+
+    .stats-bar {
+      background: #fff; border-radius: 10px; padding: 12px 22px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08);
+      display: flex; gap: 24px; flex-wrap: wrap;
+      margin-bottom: 16px; font-size: 0.85rem;
+    }
+    .stats-bar b { color: #4f6ef7; font-size: 0.95rem; }
+
+    .table-card {
+      background: #fff; border-radius: 10px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08);
+      overflow: hidden;
+    }
+    .table-wrap { overflow-x: auto; max-height: 70vh; overflow-y: auto; }
+    table { border-collapse: collapse; width: 100%; font-size: 0.82rem; }
+    th { background: #1a1a2e; color: #fff; padding: 10px 12px; text-align: left; font-weight: 600; position: sticky; top: 0; z-index: 5; font-size: 0.75rem; letter-spacing: .04em; }
+    td { padding: 9px 12px; border-bottom: 1px solid #f0f2f5; vertical-align: top; }
+    tr:hover td { background: #fafbff; }
+
+    .num { text-align: right; font-variant-numeric: tabular-nums; }
+    .mono { font-family: monospace; font-size: 0.78rem; }
+    .org-name { font-weight: 600; color: #1a1a2e; max-width: 280px; }
+    .muted { color: #aaa; font-size: 0.75rem; }
+
+    .ctr-list { display: flex; flex-direction: column; gap: 3px; min-width: 180px; }
+    .ctr-item {
+      display: flex; gap: 6px; align-items: baseline;
+      font-size: 0.72rem; padding: 2px 6px; background: #f5f7ff;
+      border-radius: 4px;
+    }
+    .ctr-type { font-family: monospace; color: #4f6ef7; font-weight: 600; }
+    .ctr-cnt { color: #1a7a4a; font-weight: 600; margin-left: auto; }
+    .ctr-area { color: #888; font-size: 0.68rem; }
+    .ctr-empty { color: #ccc; font-size: 0.72rem; font-style: italic; }
+
+    .pager {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 22px; gap: 12px; background: #fafbff; border-top: 1px solid #eef;
+    }
+    .pager-controls { display: flex; gap: 6px; align-items: center; }
+    .pager button {
+      padding: 6px 12px; border: 1px solid #ddd; background: #fff;
+      border-radius: 6px; cursor: pointer; font-size: 0.85rem;
+    }
+    .pager button:hover:not(:disabled) { background: #eef0ff; border-color: #4f6ef7; }
+    .pager button:disabled { opacity: .4; cursor: not-allowed; }
+    .pager input { width: 60px; padding: 6px 8px; border: 1px solid #ddd; border-radius: 6px; text-align: center; font-size: 0.85rem; }
+    .pager-info { font-size: 0.82rem; color: #666; }
+
+    .loading { text-align: center; padding: 48px; color: #aaa; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="brand">AgriLandTin</div>
+  <nav>
+    <a href="/">Bosh sahifa</a>
+    <a href="/land-category.html">Land Category</a>
+    <a href="/cross-matrix.html">Cross Matrix</a>
+    <a href="/six-shapes.html" class="active">6-Shakil</a>
+  </nav>
+</header>
+
+<div class="page">
+
+  <div class="geo-bar">
+    <label>Viloyat:</label>
+    <select id="geo-viloyat" onchange="onViloyatChange()">
+      <option value="">— Barcha —</option>
+    </select>
+    <span class="geo-sep">›</span>
+    <label>Tuman:</label>
+    <select id="geo-tuman" onchange="onTumanChange()" disabled>
+      <option value="">— Barcha —</option>
+    </select>
+    <button class="btn-clear" onclick="clearGeo()">✕ Tozalash</button>
+    <label style="margin-left:auto">Sahifada:</label>
+    <select id="page-size" onchange="onLimitChange()" style="min-width:80px">
+      <option value="20">20</option>
+      <option value="50">50</option>
+      <option value="100">100</option>
+    </select>
+  </div>
+
+  <div class="stats-bar">
+    <div>Jami: <b id="total-count">—</b></div>
+    <div>Sahifa: <b id="page-info">—</b></div>
+  </div>
+
+  <div class="table-card">
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:40px">#</th>
+            <th style="width:110px">TIN</th>
+            <th>Tashkilot nomi</th>
+            <th style="width:80px">SOATO</th>
+            <th class="num" style="width:120px">Jami yer (ga)</th>
+            <th class="num" style="width:120px">Q.x. (ga)</th>
+            <th class="num" style="width:110px">Haydalma (ga)</th>
+            <th class="num" style="width:100px">Ekin (ga)</th>
+            <th>Konturlar (land_fund_type)</th>
+          </tr>
+        </thead>
+        <tbody id="tbody">
+          <tr><td colspan="9"><div class="loading">Yuklanmoqda...</div></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="pager">
+      <div class="pager-info" id="pager-info">—</div>
+      <div class="pager-controls">
+        <button onclick="goPage(1)" id="btn-first">«</button>
+        <button onclick="goPage(state.page - 1)" id="btn-prev">‹ Oldingi</button>
+        <span>Sahifa</span>
+        <input type="number" id="page-input" min="1" value="1" onchange="goPage(parseInt(this.value)||1)" />
+        <span>/ <b id="total-pages">1</b></span>
+        <button onclick="goPage(state.page + 1)" id="btn-next">Keyingi ›</button>
+        <button onclick="goPage(state.pages)" id="btn-last">»</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const API = '/api/agri-land-tins';
+const state = { viloyat: '', tuman: '', page: 1, limit: 20, pages: 1 };
+
+const fmt = n => n != null ? Number(n).toLocaleString('uz-UZ', { maximumFractionDigits: 2 }) : '—';
+
+async function loadViloyats() {
+  const data = await fetch(`${API}/geo/viloyats`).then(r => r.json());
+  const sel = document.getElementById('geo-viloyat');
+  data.forEach(d => {
+    const o = document.createElement('option');
+    o.value = d._id;
+    o.textContent = `${d._id} — ${d.name || ''}`;
+    sel.appendChild(o);
+  });
+}
+
+async function onViloyatChange() {
+  state.viloyat = document.getElementById('geo-viloyat').value;
+  state.tuman = '';
+  state.page = 1;
+  const tumanSel = document.getElementById('geo-tuman');
+  tumanSel.innerHTML = '<option value="">— Barcha —</option>';
+  tumanSel.disabled = !state.viloyat;
+
+  if (state.viloyat) {
+    const data = await fetch(`${API}/geo/tumans?viloyat=${state.viloyat}`).then(r => r.json());
+    data.forEach(d => {
+      const o = document.createElement('option');
+      o.value = d._id;
+      o.textContent = `${d._id} — ${d.name || ''}`;
+      tumanSel.appendChild(o);
+    });
+  }
+  loadList();
+}
+
+function onTumanChange() {
+  state.tuman = document.getElementById('geo-tuman').value;
+  state.page = 1;
+  loadList();
+}
+
+function onLimitChange() {
+  state.limit = parseInt(document.getElementById('page-size').value);
+  state.page = 1;
+  loadList();
+}
+
+function clearGeo() {
+  state.viloyat = '';
+  state.tuman = '';
+  state.page = 1;
+  document.getElementById('geo-viloyat').value = '';
+  document.getElementById('geo-tuman').innerHTML = '<option value="">— Barcha —</option>';
+  document.getElementById('geo-tuman').disabled = true;
+  loadList();
+}
+
+function goPage(p) {
+  if (p < 1) p = 1;
+  if (p > state.pages) p = state.pages;
+  state.page = p;
+  loadList();
+}
+
+async function loadList() {
+  document.getElementById('tbody').innerHTML = '<tr><td colspan="9"><div class="loading">Yuklanmoqda...</div></td></tr>';
+  const params = new URLSearchParams();
+  if (state.viloyat) params.set('viloyat', state.viloyat);
+  if (state.tuman)   params.set('tuman',   state.tuman);
+  params.set('page',  state.page);
+  params.set('limit', state.limit);
+
+  const data = await fetch(`${API}/six-shapes?${params}`).then(r => r.json());
+  state.pages = data.pages;
+
+  document.getElementById('total-count').textContent = fmt(data.total);
+  document.getElementById('page-info').textContent = `${data.page} / ${data.pages || 1}`;
+  document.getElementById('total-pages').textContent = data.pages || 1;
+  document.getElementById('page-input').value = data.page;
+  document.getElementById('pager-info').textContent =
+    `${(data.page - 1) * data.limit + 1} – ${Math.min(data.page * data.limit, data.total)} (jami ${fmt(data.total)})`;
+
+  document.getElementById('btn-first').disabled = data.page <= 1;
+  document.getElementById('btn-prev').disabled  = data.page <= 1;
+  document.getElementById('btn-next').disabled  = data.page >= data.pages;
+  document.getElementById('btn-last').disabled  = data.page >= data.pages;
+
+  if (!data.items.length) {
+    document.getElementById('tbody').innerHTML = '<tr><td colspan="9"><div class="loading">Hech narsa topilmadi</div></td></tr>';
+    return;
+  }
+
+  const startIdx = (data.page - 1) * data.limit;
+  document.getElementById('tbody').innerHTML = data.items.map((it, i) => {
+    const ctrs = (it.contoursByType || []).length
+      ? `<div class="ctr-list">${it.contoursByType.map(c => `
+          <div class="ctr-item" title="${c.description || ''}">
+            <span class="ctr-type">${c.type}</span>
+            <span class="ctr-area">${fmt(c.area)} ga</span>
+            <span class="ctr-cnt">${c.count}</span>
+          </div>`).join('')}</div>`
+      : '<span class="ctr-empty">— yo\'q —</span>';
+
+    return `<tr>
+      <td>${startIdx + i + 1}</td>
+      <td class="mono">${it.organization_inn || '—'}</td>
+      <td class="org-name">${it.organization_name || '—'}<div class="muted">${it.land_fund_category || ''} ${it.land_fund_type ? '· ' + it.land_fund_type : ''}</div></td>
+      <td class="mono">${it.soato || '—'}</td>
+      <td class="num">${fmt(it.total_land_area)}</td>
+      <td class="num">${fmt(it.agricultural_land_total)}</td>
+      <td class="num">${fmt(it.arable_land)}</td>
+      <td class="num">${fmt(it.sown_area)}</td>
+      <td>${ctrs}</td>
+    </tr>`;
+  }).join('');
+}
+
+loadViloyats();
+loadList();
+</script>
+</body>
+</html>

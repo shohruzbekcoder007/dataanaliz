@@ -413,3 +413,94 @@ exports.getByTin = async (req, res) => {
   if (!doc) return res.status(404).json({ message: 'Topilmadi' });
   res.json(doc);
 };
+
+// SixShape ro'yxati — viloyat/tuman filter va pagination bilan
+// GET /six-shapes?viloyat=1703&tuman=1703202&page=1&limit=20
+exports.sixShapesList = async (req, res) => {
+  const { viloyat, tuman } = req.query;
+  const page  = Math.max(1, parseInt(req.query.page, 10)  || 1);
+  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
+  const skip  = (page - 1) * limit;
+
+  const sixCol = require('mongoose').connection.db.collection('six_shapes');
+
+  // SixShape filter — soato dan viloyat/tuman bo'yicha
+  const match = {};
+  if (tuman) {
+    match.soato = Number(tuman);
+  } else if (viloyat) {
+    const v = Number(viloyat);
+    match.soato = { $gte: v * 1000, $lt: (v + 1) * 1000 };
+  }
+
+  const [total, items] = await Promise.all([
+    sixCol.countDocuments(match),
+    sixCol.find(match)
+      .project({
+        organization_inn:        1,
+        organization_name:       1,
+        soato:                   1,
+        old_soato:               1,
+        total_land_area:         1,
+        agricultural_land_total: 1,
+        arable_land:             1,
+        sown_area:               1,
+        greenhouse_land_area:    1,
+        land_fund_category:      1,
+        land_fund_type:          1,
+        status_name:             1,
+      })
+      .sort({ organization_inn: 1 })
+      .skip(skip)
+      .limit(limit)
+      .toArray(),
+  ]);
+
+  // Joriy sahifadagi TINlar bo'yicha AgriLandFull dan kontur soni land_fund_type bo'yicha
+  const tins = items.map(i => String(i.organization_inn)).filter(Boolean);
+
+  const aglCol = require('mongoose').connection.db.collection('agri_land_full');
+  const geoMatch = {};
+  if (viloyat) geoMatch.viloyat_code = String(viloyat);
+  if (tuman)   geoMatch.tuman_code   = String(tuman);
+
+  const contours = await aglCol.aggregate([
+    { $match: { tin: { $in: tins }, ...geoMatch } },
+    {
+      $group: {
+        _id:         { tin: '$tin', type: '$land_fund_type' },
+        count:       { $sum: 1 },
+        description: { $first: '$land_fund_type_description' },
+        area_sum: {
+          $sum: { $convert: { input: '$gis_area_ha', to: 'double', onError: 0, onNull: 0 } },
+        },
+      },
+    },
+    { $sort: { '_id.tin': 1, '_id.type': 1 } },
+  ], { allowDiskUse: true }).toArray();
+
+  // Map: tin -> [ { type, description, count, area } ]
+  const contourMap = {};
+  contours.forEach(c => {
+    const tin = c._id.tin;
+    if (!contourMap[tin]) contourMap[tin] = [];
+    contourMap[tin].push({
+      type:        c._id.type || '—',
+      description: c.description || '',
+      count:       c.count,
+      area:        +c.area_sum.toFixed(4),
+    });
+  });
+
+  // Har bir item ga contoursByType qo'shamiz
+  const enriched = items.map(it => ({
+    ...it,
+    contoursByType: contourMap[String(it.organization_inn)] || [],
+  }));
+
+  res.json({
+    total, page, limit,
+    pages: Math.ceil(total / limit),
+    items: enriched,
+  });
+};
