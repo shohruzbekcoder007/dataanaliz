@@ -40,6 +40,9 @@ router.get('/geo/tumans',           ctrl.getTumans);
 // 6-shakl ro'yxati pagination bilan
 router.get('/six-shapes',           ctrl.sixShapesList);
 
+// Hokimyat agri land mat — barcha ma'lumotlar (pagination yo'q)
+router.get('/hokimyat-mat',         ctrl.hokimyatMatList);
+
 // Qidiruv — tin bo'yicha
 router.get('/tin/:tin',             ctrl.getByTin);
 

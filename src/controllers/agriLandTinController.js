@@ -1,5 +1,29 @@
 const AgriLandTin = require('../models/AgriLandTin');
+const HokimyatAgriLandMat = require('../models/HokimyatAgriLandMat');
 const XLSX        = require('xlsx');
+
+// Hokimyat agri land mat — barcha ma'lumotlar
+exports.hokimyatMatList = async (req, res) => {
+  const items = await HokimyatAgriLandMat.find({})
+    .select('soato7 soato4 tuman_nomi xokimiyat_nomi inn defined_arable_area_size total_gis_area_ha total_land_area reserve_land_clean_remainder_area six_shape_info areas')
+    .lean();
+
+  const enriched = items.map(it => ({
+    soato7: it.soato7,
+    soato4: it.soato4,
+    tuman_nomi: it.tuman_nomi,
+    xokimiyat_nomi: it.xokimiyat_nomi,
+    inn: it.inn,
+    defined_arable_area_size: it.defined_arable_area_size || 0,
+    total_gis_area_ha: it.total_gis_area_ha || 0,
+    total_land_area: it.total_land_area || 0,
+    reserve_land_clean_remainder_area: it.reserve_land_clean_remainder_area || 0,
+    six_shape_count: Array.isArray(it.six_shape_info) ? it.six_shape_info.length : 0,
+    areas_count: Array.isArray(it.areas) ? it.areas.length : 0,
+  }));
+
+  res.json({ total: enriched.length, items: enriched });
+};
 
 // Umumiy statistika
 exports.getStats = async (req, res) => {
@@ -521,3 +545,4 @@ exports.sixShapesList = async (req, res) => {
     items: enriched,
   });
 };
+

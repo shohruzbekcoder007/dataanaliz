@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hokimyat Agri Land Mat</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f0f2f5;
+      color: #1a1a2e;
+    }
+
+    header {
+      background: #1a1a2e;
+      color: #fff;
+      padding: 0 32px;
+      display: flex;
+      align-items: center;
+      gap: 32px;
+      height: 54px;
+    }
+    header .brand { font-size: 1rem; font-weight: 700; white-space: nowrap; }
+    nav a {
+      color: rgba(255,255,255,.6);
+      text-decoration: none;
+      font-size: 0.88rem;
+      padding: 6px 12px;
+      border-radius: 6px;
+      transition: background .15s;
+    }
+    nav a:hover, nav a.active { background: rgba(255,255,255,.12); color: #fff; }
+
+    .stats-bar {
+      display: flex;
+      gap: 16px;
+      padding: 20px 32px;
+      flex-wrap: wrap;
+    }
+    .stat-card {
+      background: #fff;
+      border-radius: 10px;
+      padding: 14px 22px;
+      min-width: 160px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08);
+    }
+    .stat-card .label { font-size: 0.72rem; color: #888; text-transform: uppercase; letter-spacing: .05em; }
+    .stat-card .value { font-size: 1.6rem; font-weight: 700; margin-top: 4px; color: #1a1a2e; }
+
+    .search-bar {
+      padding: 0 32px 16px;
+    }
+    .search-bar input {
+      width: 100%;
+      max-width: 420px;
+      padding: 9px 14px;
+      border: 1px solid #ddd;
+      border-radius: 7px;
+      font-size: 0.92rem;
+      outline: none;
+      background: #fff;
+    }
+    .search-bar input:focus { border-color: #4f6ef7; }
+
+    .table-wrap {
+      padding: 0 32px 32px;
+    }
+    .table-card {
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08);
+      overflow: auto;
+      max-height: calc(100vh - 240px);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+    thead th {
+      position: sticky;
+      top: 0;
+      background: #f8f9ff;
+      color: #444;
+      font-weight: 600;
+      text-align: left;
+      padding: 11px 12px;
+      border-bottom: 2px solid #e8ecff;
+      white-space: nowrap;
+      z-index: 1;
+    }
+    tbody td {
+      padding: 10px 12px;
+      border-bottom: 1px solid #f0f1f5;
+      vertical-align: top;
+    }
+    tbody tr:hover { background: #fafbff; }
+    td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    td.muted { color: #999; }
+    .loading { text-align: center; padding: 40px; color: #aaa; font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="brand">AgriLandTin</div>
+  <nav>
+    <a href="/">Bosh sahifa</a>
+    <a href="/land-category.html">Land Category</a>
+    <a href="/cross-matrix.html">Cross Matrix</a>
+    <a href="/six-shapes.html">6-shakl</a>
+    <a href="/hokimyat-mat.html" class="active">Hokimyat Mat</a>
+  </nav>
+</header>
+
+<div class="stats-bar">
+  <div class="stat-card">
+    <div class="label">Jami yozuvlar</div>
+    <div class="value" id="s-total">...</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Jami land area</div>
+    <div class="value" id="s-land">...</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Jami GIS area</div>
+    <div class="value" id="s-gis">...</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Jami qoldiq</div>
+    <div class="value" id="s-rem">...</div>
+  </div>
+</div>
+
+<div class="search-bar">
+  <input id="q" type="text" placeholder="Qidirish: tuman, xokimiyat, INN, SOATO..." />
+</div>
+
+<div class="table-wrap">
+  <div class="table-card">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>SOATO7</th>
+          <th>SOATO4</th>
+          <th>Tuman</th>
+          <th>INN</th>
+          <th>Tuman chizilgan maydon</th>
+          <th>tin ga tuman ko'rsatilgan</th>
+          <th style="background:#9AD872">6-shaklda maydon</th>
+          <th style="background:#9AD872">Kesilgan hokimyat zahirasi</th>
+        </tr>
+      </thead>
+      <tbody id="tb">
+        <tr><td colspan="9" class="loading">Yuklanmoqda...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+const API = '/api/agri-land-tins';
+let ALL = [];
+
+const fmt = n => Number(n || 0).toLocaleString('uz-UZ', { maximumFractionDigits: 2 });
+const fmtInt = n => Number(n || 0).toLocaleString('uz-UZ');
+
+function render(items) {
+  const tb = document.getElementById('tb');
+  if (!items.length) {
+    tb.innerHTML = '<tr><td colspan="9" class="loading">Ma\'lumot topilmadi</td></tr>';
+    return;
+  }
+  tb.innerHTML = items.map((it, i) => `
+    <tr>
+      <td>${i + 1}</td>
+      <td>${it.soato7 || '<span class="muted">—</span>'}</td>
+      <td>${it.soato4 || '<span class="muted">—</span>'}</td>
+      <td>${it.tuman_nomi || '<span class="muted">—</span>'}</td>
+      <td style="background:#F9DC5C">${it.inn || '<span class="muted">—</span>'}</td>
+      <td class="num">${fmt(it.defined_arable_area_size)}</td>
+      <td class="num">${fmt(it.total_gis_area_ha)}</td>
+      <td class="num" style="background:#9AD872">${fmt(it.total_land_area)}</td>
+      <td class="num" style="background:#9AD872">${fmt(it.reserve_land_clean_remainder_area)}</td>
+    </tr>
+  `).join('');
+}
+
+function applyFilter() {
+  const q = document.getElementById('q').value.trim().toLowerCase();
+  if (!q) return render(ALL);
+  const filtered = ALL.filter(it =>
+    (it.soato7 || '').toLowerCase().includes(q) ||
+    (it.soato4 || '').toLowerCase().includes(q) ||
+    (it.tuman_nomi || '').toLowerCase().includes(q) ||
+    (it.xokimiyat_nomi || '').toLowerCase().includes(q) ||
+    (it.inn || '').toLowerCase().includes(q)
+  );
+  render(filtered);
+}
+
+document.getElementById('q').addEventListener('input', applyFilter);
+
+(async () => {
+  const r = await fetch(`${API}/hokimyat-mat`);
+  const data = await r.json();
+  ALL = data.items || [];
+
+  const sumLand = ALL.reduce((s, x) => s + (x.total_land_area || 0), 0);
+  const sumGis  = ALL.reduce((s, x) => s + (x.total_gis_area_ha || 0), 0);
+  const sumRem  = ALL.reduce((s, x) => s + (x.reserve_land_clean_remainder_area || 0), 0);
+
+  document.getElementById('s-total').textContent = fmtInt(data.total);
+  document.getElementById('s-land').textContent  = fmt(sumLand);
+  document.getElementById('s-gis').textContent   = fmt(sumGis);
+  document.getElementById('s-rem').textContent   = fmt(sumRem);
+
+  render(ALL);
+})();
+</script>
+</body>
+</html>
