@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Hokimyat Agri Land Mat</title>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -115,8 +116,9 @@
   </nav>
 </header>
 
-<div class="search-bar">
+<div class="search-bar" style="display:flex; gap:10px; align-items:center;">
   <input id="q" type="text" placeholder="Qidirish: tuman, xokimiyat, INN, SOATO..." />
+  <button id="export-btn" style="padding:9px 18px; background:#2a9d3f; color:#fff; border:none; border-radius:7px; cursor:pointer; font-size:0.92rem; white-space:nowrap;">Excel yuklab olish</button>
 </div>
 
 <div class="table-wrap">
@@ -129,10 +131,10 @@
           <th>SOATO4</th>
           <th>Tuman</th>
           <th>INN</th>
-          <th>Tuman chizilgan maydon</th>
-          <th>tin ga tuman ko'rsatilgan</th>
+          <th>Tuman zahirasi sifatida chizilgan maydon</th>
+          <th>Kasdastirda hokimyat ko'rsatilgan</th>
           <th style="background:#9AD872">6-shaklda maydon</th>
-          <th style="background:#9AD872">Kesilgan hokimyat zahirasi</th>
+          <th style="background:#9AD872">Hokimyat zahira maydoni sifadida ajratilgan maydon</th>
           <th>Farq</th>
         </tr>
       </thead>
@@ -215,6 +217,51 @@ function applyFilter() {
 }
 
 document.getElementById('q').addEventListener('input', applyFilter);
+
+document.getElementById('export-btn').addEventListener('click', () => {
+  const q = document.getElementById('q').value.trim().toLowerCase();
+  const items = !q ? ALL : ALL.filter(it =>
+    (it.soato7 || '').toLowerCase().includes(q) ||
+    (it.soato4 || '').toLowerCase().includes(q) ||
+    (it.tuman_nomi || '').toLowerCase().includes(q) ||
+    (it.xokimiyat_nomi || '').toLowerCase().includes(q) ||
+    (it.inn || '').toLowerCase().includes(q)
+  );
+
+  const header = ['#','SOATO7','SOATO4','Tuman','INN','Tuman chizilgan maydon','tin ga tuman ko\'rsatilgan','6-shaklda maydon','Kesilgan hokimyat zahirasi','Farq'];
+  const rows = items.map((it, i) => [
+    i + 1,
+    it.soato7 || '',
+    it.soato4 || '',
+    it.tuman_nomi || '',
+    it.inn || '',
+    +(it.defined_arable_area_size || 0),
+    +(it.total_gis_area_ha || 0),
+    +(it.total_land_area || 0),
+    +(it.reserve_land_clean_remainder_area || 0),
+    +((it.total_land_area || 0) - (it.reserve_land_clean_remainder_area || 0)),
+  ]);
+
+  const sumDef  = items.reduce((s, x) => s + (x.defined_arable_area_size || 0), 0);
+  const sumGis  = items.reduce((s, x) => s + (x.total_gis_area_ha || 0), 0);
+  const sumLand = items.reduce((s, x) => s + (x.total_land_area || 0), 0);
+  const sumRem  = items.reduce((s, x) => s + (x.reserve_land_clean_remainder_area || 0), 0);
+  let posDiff = 0, negDiff = 0;
+  items.forEach(x => {
+    const d = (x.total_land_area || 0) - (x.reserve_land_clean_remainder_area || 0);
+    if (d >= 0) posDiff += d; else negDiff += d;
+  });
+
+  const totalRow = ['Jami','','','','', sumDef, sumGis, sumLand, sumRem, `${negDiff.toFixed(2)} / +${posDiff.toFixed(2)}`];
+
+  const ws = XLSX.utils.aoa_to_sheet([header, ...rows, totalRow]);
+  ws['!cols'] = [{wch:5},{wch:10},{wch:8},{wch:22},{wch:14},{wch:20},{wch:22},{wch:18},{wch:24},{wch:22}];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Hokimyat Mat');
+  const ts = new Date().toISOString().slice(0,10);
+  XLSX.writeFile(wb, `hokimyat-mat-${ts}.xlsx`);
+});
 
 (async () => {
   const r = await fetch(`${API}/hokimyat-mat`);
