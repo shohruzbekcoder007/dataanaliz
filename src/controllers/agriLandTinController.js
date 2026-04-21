@@ -1,5 +1,14 @@
 const AgriLandTin = require('../models/AgriLandTin');
 const HokimyatAgriLandMat = require('../models/HokimyatAgriLandMat');
+const KattaTashkilotlarReport = require('../models/KattaTashkilotlarReport');
+
+// Katta tashkilotlar report — barcha ma'lumotlar
+exports.kattaTashkilotlarList = async (req, res) => {
+  const items = await KattaTashkilotlarReport.find({})
+    .select('tin defined_arable_area_size_list_sum defined_area_size_list_sum gis_area_ha_list2_sum gis_area_ha_list_sum six_total_land_area_sum')
+    .lean();
+  res.json({ total: items.length, items });
+};
 const XLSX        = require('xlsx');
 
 // Hokimyat agri land mat — barcha ma'lumotlar

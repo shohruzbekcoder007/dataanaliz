@@ -43,6 +43,9 @@ router.get('/six-shapes',           ctrl.sixShapesList);
 // Hokimyat agri land mat — barcha ma'lumotlar (pagination yo'q)
 router.get('/hokimyat-mat',         ctrl.hokimyatMatList);
 
+// Katta tashkilotlar report — barcha ma'lumotlar (pagination yo'q)
+router.get('/katta-tashkilotlar',   ctrl.kattaTashkilotlarList);
+
 // Qidiruv — tin bo'yicha
 router.get('/tin/:tin',             ctrl.getByTin);
 
