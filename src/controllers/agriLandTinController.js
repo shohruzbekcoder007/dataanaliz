@@ -25,7 +25,7 @@ exports.tinSoatoPairsList = async (req, res) => {
   const [total, items, totals] = await Promise.all([
     col.countDocuments(filter),
     col.find(filter)
-      .project({ tin: 1, soato: 1, total_land_area: 1, gis_area_ha_total: 1, arable_area_size_total: 1 })
+      .project({ tin: 1, soato: 1, total_land_area: 1, gis_area_ha_total: 1, arable_area_size_total: 1, bergan_total: 1, olgan_total: 1 })
       .sort({ total_land_area: -1 })
       .skip(skip).limit(limit)
       .toArray(),
@@ -35,16 +35,20 @@ exports.tinSoatoPairsList = async (req, res) => {
           land: { $convert: { input: '$total_land_area', to: 'double', onError: 0, onNull: 0 } },
           gis:  { $convert: { input: '$gis_area_ha_total', to: 'double', onError: 0, onNull: 0 } },
           arab: { $convert: { input: '$arable_area_size_total', to: 'double', onError: 0, onNull: 0 } },
+          bergan: { $convert: { input: '$bergan_total', to: 'double', onError: 0, onNull: 0 } },
+          olgan:  { $convert: { input: '$olgan_total', to: 'double', onError: 0, onNull: 0 } },
       }},
       { $project: {
-          land: 1, gis: 1, arab: 1,
-          diff: { $subtract: [{ $add: ['$gis', '$arab'] }, '$land'] },
+          land: 1, gis: 1, arab: 1, bergan: 1, olgan: 1,
+          diff: { $add: [{ $subtract: [{ $add: ['$gis', '$arab'] }, '$land'] }, { $multiply: ['$bergan', -1] }, '$olgan'] },
       }},
       { $group: {
           _id: null,
           total_land_area: { $sum: '$land' },
           gis_area_ha_total: { $sum: '$gis' },
           arable_area_size_total: { $sum: '$arab' },
+          bergan_total: { $sum: '$bergan' },
+          olgan_total: { $sum: '$olgan' },
           pos_diff: { $sum: { $cond: [{ $gte: ['$diff', 0] }, '$diff', 0] } },
           neg_diff: { $sum: { $cond: [{ $lt:  ['$diff', 0] }, '$diff', 0] } },
       }},
@@ -60,6 +64,8 @@ exports.tinSoatoPairsList = async (req, res) => {
       total_land_area: t.total_land_area,
       gis_area_ha_total: t.gis_area_ha_total,
       arable_area_size_total: t.arable_area_size_total,
+      bergan_total: t.bergan_total || 0,
+      olgan_total: t.olgan_total || 0,
       pos_diff: t.pos_diff || 0,
       neg_diff: t.neg_diff || 0,
     },

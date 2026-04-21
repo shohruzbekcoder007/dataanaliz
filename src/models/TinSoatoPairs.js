@@ -7,6 +7,8 @@ const tinSoatoPairsSchema = new mongoose.Schema(
     total_land_area: { type: Number, default: 0 },
     gis_area_ha_total: { type: Number, default: 0 },
     arable_area_size_total: { type: Number, default: 0 },
+    bergan_total: { type: Number, default: 0 },
+    olgan_total: { type: Number, default: 0 },
   },
   {
     collection: "tin_soato_pairs",

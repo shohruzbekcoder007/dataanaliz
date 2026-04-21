@@ -162,11 +162,13 @@
           <th style="text-align: right;">Chizilgan maydon (га)</th>
           <th style="text-align: right;">Kadastir + chizilgan</th>
           <th style="text-align: right;">6-shaklda ko'rsatilgan maydon (га)</th>
+          <th style="text-align: right;">Bergan</th>
+          <th style="text-align: right;">Olgan</th>
           <th style="text-align: right;">Farq</th>
         </tr>
       </thead>
       <tbody id="tb">
-        <tr><td colspan="8" class="loading">Yuklanmoqda...</td></tr>
+        <tr><td colspan="10" class="loading">Yuklanmoqda...</td></tr>
       </tbody>
     </table>
   </div>
@@ -205,7 +207,7 @@ async function load() {
 function render(items, offset) {
   const tb = document.getElementById('tb');
   if (!items.length) {
-    tb.innerHTML = '<tr><td colspan="8" class="loading">Ma\'lumot topilmadi</td></tr>';
+    tb.innerHTML = '<tr><td colspan="10" class="loading">Ma\'lumot topilmadi</td></tr>';
     return;
   }
   const rows = items.map((it, i) => `
@@ -217,7 +219,9 @@ function render(items, offset) {
       <td class="num">${fmt(it.arable_area_size_total)}</td>
       <td class="num">${fmt((it.gis_area_ha_total || 0) + (it.arable_area_size_total || 0))}</td>
       <td class="num">${fmt(it.total_land_area)}</td>
-      <td class="num">${fmt(((it.gis_area_ha_total || 0) + (it.arable_area_size_total || 0)) - (it.total_land_area || 0))}</td>
+      <td class="num">${fmt(it.bergan_total)}</td>
+      <td class="num">${fmt(it.olgan_total)}</td>
+      <td class="num">${fmt(((it.gis_area_ha_total || 0) + (it.arable_area_size_total || 0)) - (it.total_land_area || 0) - (it.bergan_total || 0) + (it.olgan_total || 0))}</td>
     </tr>
   `).join('');
 
@@ -229,6 +233,8 @@ function render(items, offset) {
       <td class="num">${fmt(t.arable_area_size_total)}</td>
       <td class="num">${fmt((t.gis_area_ha_total || 0) + (t.arable_area_size_total || 0))}</td>
       <td class="num">${fmt(t.total_land_area)}</td>
+      <td class="num">${fmt(t.bergan_total)}</td>
+      <td class="num">${fmt(t.olgan_total)}</td>
       <td class="num">
         <span style="color:#e55">${fmt(t.neg_diff)}</span>
         &nbsp;/&nbsp;
@@ -302,22 +308,24 @@ document.getElementById('export-btn').addEventListener('click', async () => {
     page++;
   } while (page <= totalPages);
 
-  const header = ['#','TIN','SOATO','Kadastrdagi umumiy maydon (ga)','Chizilgan maydon (ga)','Kadastir + chizilgan','6-shaklda ko\'rsatilgan maydon (ga)','Farq'];
+  const header = ['#','TIN','SOATO','Kadastrdagi umumiy maydon (ga)','Chizilgan maydon (ga)','Kadastir + chizilgan','6-shaklda ko\'rsatilgan maydon (ga)','Bergan','Olgan','Farq'];
   const rows = items.map((it, i) => {
     const gis = +(it.gis_area_ha_total || 0);
     const arable = +(it.arable_area_size_total || 0);
     const land = +(it.total_land_area || 0);
-    return [ i + 1, it.tin || '', it.soato || '', gis, arable, gis + arable, land, (gis + arable) - land ];
+    const bergan = +(it.bergan_total || 0);
+    const olgan = +(it.olgan_total || 0);
+    return [ i + 1, it.tin || '', it.soato || '', gis, arable, gis + arable, land, bergan, olgan, (gis + arable) - land - bergan + olgan ];
   });
 
   const t = totals || {};
   const tGis = t.gis_area_ha_total || 0;
   const tArable = t.arable_area_size_total || 0;
   const tLand = t.total_land_area || 0;
-  const totalRow = ['Jami','','', tGis, tArable, tGis + tArable, tLand, (tGis + tArable) - tLand];
+  const totalRow = ['Jami','','', tGis, tArable, tGis + tArable, tLand, t.bergan_total || 0, t.olgan_total || 0, (tGis + tArable) - tLand - (t.bergan_total || 0) + (t.olgan_total || 0)];
 
   const ws = XLSX.utils.aoa_to_sheet([header, ...rows, totalRow]);
-  ws['!cols'] = [{wch:7},{wch:14},{wch:12},{wch:26},{wch:22},{wch:22},{wch:30},{wch:18}];
+  ws['!cols'] = [{wch:7},{wch:14},{wch:12},{wch:26},{wch:22},{wch:22},{wch:30},{wch:14},{wch:14},{wch:18}];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'TIN-SOATO');
   const ts = new Date().toISOString().slice(0,10);
