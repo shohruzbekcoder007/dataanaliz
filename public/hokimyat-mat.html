@@ -50,7 +50,7 @@
     .stat-card .value { font-size: 1.6rem; font-weight: 700; margin-top: 4px; color: #1a1a2e; }
 
     .search-bar {
-      padding: 0 32px 16px;
+      padding: 32px 16px;
     }
     .search-bar input {
       width: 100%;
@@ -115,25 +115,6 @@
   </nav>
 </header>
 
-<div class="stats-bar">
-  <div class="stat-card">
-    <div class="label">Jami yozuvlar</div>
-    <div class="value" id="s-total">...</div>
-  </div>
-  <div class="stat-card">
-    <div class="label">Jami land area</div>
-    <div class="value" id="s-land">...</div>
-  </div>
-  <div class="stat-card">
-    <div class="label">Jami GIS area</div>
-    <div class="value" id="s-gis">...</div>
-  </div>
-  <div class="stat-card">
-    <div class="label">Jami qoldiq</div>
-    <div class="value" id="s-rem">...</div>
-  </div>
-</div>
-
 <div class="search-bar">
   <input id="q" type="text" placeholder="Qidirish: tuman, xokimiyat, INN, SOATO..." />
 </div>
@@ -152,10 +133,11 @@
           <th>tin ga tuman ko'rsatilgan</th>
           <th style="background:#9AD872">6-shaklda maydon</th>
           <th style="background:#9AD872">Kesilgan hokimyat zahirasi</th>
+          <th>Farq</th>
         </tr>
       </thead>
       <tbody id="tb">
-        <tr><td colspan="9" class="loading">Yuklanmoqda...</td></tr>
+        <tr><td colspan="10" class="loading">Yuklanmoqda...</td></tr>
       </tbody>
     </table>
   </div>
@@ -171,10 +153,10 @@ const fmtInt = n => Number(n || 0).toLocaleString('uz-UZ');
 function render(items) {
   const tb = document.getElementById('tb');
   if (!items.length) {
-    tb.innerHTML = '<tr><td colspan="9" class="loading">Ma\'lumot topilmadi</td></tr>';
+    tb.innerHTML = '<tr><td colspan="10" class="loading">Ma\'lumot topilmadi</td></tr>';
     return;
   }
-  tb.innerHTML = items.map((it, i) => `
+  const rows = items.map((it, i) => `
     <tr>
       <td>${i + 1}</td>
       <td>${it.soato7 || '<span class="muted">—</span>'}</td>
@@ -185,8 +167,38 @@ function render(items) {
       <td class="num">${fmt(it.total_gis_area_ha)}</td>
       <td class="num" style="background:#9AD872">${fmt(it.total_land_area)}</td>
       <td class="num" style="background:#9AD872">${fmt(it.reserve_land_clean_remainder_area)}</td>
+      <td class="num">${fmt((it.total_land_area || 0) - (it.reserve_land_clean_remainder_area || 0))}</td>
     </tr>
   `).join('');
+
+  const sumDef  = items.reduce((s, x) => s + (x.defined_arable_area_size || 0), 0);
+  const sumGis  = items.reduce((s, x) => s + (x.total_gis_area_ha || 0), 0);
+  const sumLand = items.reduce((s, x) => s + (x.total_land_area || 0), 0);
+  const sumRem  = items.reduce((s, x) => s + (x.reserve_land_clean_remainder_area || 0), 0);
+
+  let posDiff = 0, negDiff = 0;
+  items.forEach(x => {
+    const d = (x.total_land_area || 0) - (x.reserve_land_clean_remainder_area || 0);
+    if (d >= 0) posDiff += d;
+    else negDiff += d;
+  });
+
+  const totalRow = `
+    <tr style="font-weight:700; background:#eef1ff;">
+      <td colspan="5">Jami</td>
+      <td class="num">${fmt(sumDef)}</td>
+      <td class="num">${fmt(sumGis)}</td>
+      <td class="num" style="background:#9AD872">${fmt(sumLand)}</td>
+      <td class="num" style="background:#9AD872">${fmt(sumRem)}</td>
+      <td class="num">
+        <span style="color:#e55">${fmt(negDiff)}</span>
+        &nbsp;/&nbsp;
+        <span style="color:#2a9d3f">+${fmt(posDiff)}</span>
+      </td>
+    </tr>
+  `;
+
+  tb.innerHTML = rows + totalRow;
 }
 
 function applyFilter() {
@@ -208,15 +220,6 @@ document.getElementById('q').addEventListener('input', applyFilter);
   const r = await fetch(`${API}/hokimyat-mat`);
   const data = await r.json();
   ALL = data.items || [];
-
-  const sumLand = ALL.reduce((s, x) => s + (x.total_land_area || 0), 0);
-  const sumGis  = ALL.reduce((s, x) => s + (x.total_gis_area_ha || 0), 0);
-  const sumRem  = ALL.reduce((s, x) => s + (x.reserve_land_clean_remainder_area || 0), 0);
-
-  document.getElementById('s-total').textContent = fmtInt(data.total);
-  document.getElementById('s-land').textContent  = fmt(sumLand);
-  document.getElementById('s-gis').textContent   = fmt(sumGis);
-  document.getElementById('s-rem').textContent   = fmt(sumRem);
 
   render(ALL);
 })();
