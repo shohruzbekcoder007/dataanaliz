@@ -46,6 +46,9 @@ router.get('/hokimyat-mat',         ctrl.hokimyatMatList);
 // Katta tashkilotlar report — barcha ma'lumotlar (pagination yo'q)
 router.get('/katta-tashkilotlar',   ctrl.kattaTashkilotlarList);
 
+// Tin-Soato pairs — barcha ma'lumotlar (pagination yo'q)
+router.get('/tin-soato-pairs',      ctrl.tinSoatoPairsList);
+
 // Qidiruv — tin bo'yicha
 router.get('/tin/:tin',             ctrl.getByTin);
 

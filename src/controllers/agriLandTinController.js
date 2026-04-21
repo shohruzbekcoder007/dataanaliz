@@ -1,6 +1,71 @@
 const AgriLandTin = require('../models/AgriLandTin');
 const HokimyatAgriLandMat = require('../models/HokimyatAgriLandMat');
 const KattaTashkilotlarReport = require('../models/KattaTashkilotlarReport');
+const TinSoatoPairs = require('../models/TinSoatoPairs');
+
+// Tin-Soato pairs — pagination + soato/tin filter (native driver)
+exports.tinSoatoPairsList = async (req, res) => {
+  const { tin, soato, all } = req.query;
+  const page  = Math.max(1, parseInt(req.query.page, 10)  || 1);
+  const limit = Math.min(500, Math.max(1, parseInt(req.query.limit, 10) || 50));
+  const skip  = (page - 1) * limit;
+
+  const col = require('mongoose').connection.db.collection('tin_soato_pairs');
+
+  const filter = all ? {} : {
+    $or: [
+      { total_land_area: { $gt: 0 } },
+      { gis_area_ha_total: { $gt: 0 } },
+      { arable_area_size_total: { $gt: 0 } },
+    ],
+  };
+  if (tin)   filter.tin   = { $regex: String(tin).trim(), $options: 'i' };
+  if (soato) filter.soato = { $regex: '^' + String(soato).trim() };
+
+  const [total, items, totals] = await Promise.all([
+    col.countDocuments(filter),
+    col.find(filter)
+      .project({ tin: 1, soato: 1, total_land_area: 1, gis_area_ha_total: 1, arable_area_size_total: 1 })
+      .sort({ total_land_area: -1 })
+      .skip(skip).limit(limit)
+      .toArray(),
+    col.aggregate([
+      { $match: filter },
+      { $project: {
+          land: { $convert: { input: '$total_land_area', to: 'double', onError: 0, onNull: 0 } },
+          gis:  { $convert: { input: '$gis_area_ha_total', to: 'double', onError: 0, onNull: 0 } },
+          arab: { $convert: { input: '$arable_area_size_total', to: 'double', onError: 0, onNull: 0 } },
+      }},
+      { $project: {
+          land: 1, gis: 1, arab: 1,
+          diff: { $subtract: [{ $add: ['$gis', '$arab'] }, '$land'] },
+      }},
+      { $group: {
+          _id: null,
+          total_land_area: { $sum: '$land' },
+          gis_area_ha_total: { $sum: '$gis' },
+          arable_area_size_total: { $sum: '$arab' },
+          pos_diff: { $sum: { $cond: [{ $gte: ['$diff', 0] }, '$diff', 0] } },
+          neg_diff: { $sum: { $cond: [{ $lt:  ['$diff', 0] }, '$diff', 0] } },
+      }},
+    ]).toArray(),
+  ]);
+
+  const t = totals[0] || { total_land_area: 0, gis_area_ha_total: 0, arable_area_size_total: 0, pos_diff: 0, neg_diff: 0 };
+
+  res.json({
+    total, page, limit,
+    pages: Math.ceil(total / limit) || 1,
+    totals: {
+      total_land_area: t.total_land_area,
+      gis_area_ha_total: t.gis_area_ha_total,
+      arable_area_size_total: t.arable_area_size_total,
+      pos_diff: t.pos_diff || 0,
+      neg_diff: t.neg_diff || 0,
+    },
+    items,
+  });
+};
 
 // Katta tashkilotlar report — barcha ma'lumotlar
 exports.kattaTashkilotlarList = async (req, res) => {

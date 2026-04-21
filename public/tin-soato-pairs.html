@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TIN-SOATO Pairs</title>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f0f2f5;
+      color: #1a1a2e;
+    }
+
+    header {
+      background: #1a1a2e;
+      color: #fff;
+      padding: 0 32px;
+      display: flex;
+      align-items: center;
+      gap: 32px;
+      height: 54px;
+    }
+    header .brand { font-size: 1rem; font-weight: 700; white-space: nowrap; }
+    nav a {
+      color: rgba(255,255,255,.6);
+      text-decoration: none;
+      font-size: 0.88rem;
+      padding: 6px 12px;
+      border-radius: 6px;
+      transition: background .15s;
+    }
+    nav a:hover, nav a.active { background: rgba(255,255,255,.12); color: #fff; }
+
+    .filter-bar {
+      padding: 20px 32px 12px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .filter-bar input, .filter-bar select {
+      padding: 9px 14px;
+      border: 1px solid #ddd;
+      border-radius: 7px;
+      font-size: 0.92rem;
+      outline: none;
+      background: #fff;
+    }
+    .filter-bar input:focus, .filter-bar select:focus { border-color: #4f6ef7; }
+    .filter-bar .label { font-size: 0.82rem; color: #666; }
+    .filter-bar button {
+      padding: 9px 18px;
+      border: none; border-radius: 7px;
+      cursor: pointer; font-size: 0.92rem;
+      white-space: nowrap;
+    }
+    .btn-primary { background: #4f6ef7; color: #fff; }
+    .btn-primary:hover { background: #3a56d4; }
+    .btn-success { background: #2a9d3f; color: #fff; }
+    .btn-ghost { background: #eef1ff; color: #4f6ef7; }
+
+    .table-wrap { padding: 0 32px 16px; }
+    .table-card {
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08);
+      overflow: auto;
+      max-height: calc(100vh - 260px);
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    thead th {
+      position: sticky; top: 0;
+      background: #f8f9ff; color: #444;
+      font-weight: 600; text-align: left;
+      padding: 11px 12px;
+      border-bottom: 2px solid #e8ecff;
+      white-space: nowrap; z-index: 1;
+    }
+    tbody td {
+      padding: 10px 12px;
+      border-bottom: 1px solid #f0f1f5;
+      vertical-align: top;
+    }
+    tbody tr:hover { background: #fafbff; }
+    td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    td.muted { color: #999; }
+    .loading { text-align: center; padding: 40px; color: #aaa; font-size: 0.9rem; }
+
+    .pagination {
+      padding: 0 32px 32px;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .pagination button {
+      padding: 7px 14px;
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.88rem;
+    }
+    .pagination button:hover:not(:disabled) { background: #eef1ff; border-color: #4f6ef7; color: #4f6ef7; }
+    .pagination button:disabled { opacity: 0.4; cursor: not-allowed; }
+    .pagination .info { font-size: 0.85rem; color: #666; padding: 0 8px; }
+    .pagination input {
+      width: 60px;
+      padding: 6px 8px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 0.88rem;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="brand">AgriLandTin</div>
+  <nav>
+    <a href="/">Bosh sahifa</a>
+    <a href="/land-category.html">Land Category</a>
+    <a href="/cross-matrix.html">Cross Matrix</a>
+    <a href="/six-shapes.html">6-shakl</a>
+    <a href="/hokimyat-mat.html">Hokimyat Mat</a>
+    <a href="/katta-tashkilotlar.html">Katta Tashkilotlar</a>
+    <a href="/tin-soato-pairs.html" class="active">TIN-SOATO</a>
+  </nav>
+</header>
+
+<div class="filter-bar">
+  <input id="tin-input" type="text" placeholder="TIN..." />
+  <input id="soato-input" type="text" placeholder="SOATO (boshi)..." />
+  <select id="limit">
+    <option value="20">20</option>
+    <option value="50" selected>50</option>
+    <option value="100">100</option>
+    <option value="200">200</option>
+    <option value="500">500</option>
+  </select>
+  <button class="btn-primary" onclick="applyFilter()">Qidirish</button>
+  <button class="btn-ghost" onclick="clearFilter()">Tozalash</button>
+  <span class="label" id="result-info">—</span>
+  <div style="flex:1"></div>
+  <button class="btn-success" id="export-btn">Excel yuklab olish</button>
+</div>
+
+<div class="table-wrap">
+  <div class="table-card">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th style="background:#F9DC5C">TIN</th>
+          <th>SOATO</th>
+          <th style="text-align: right;">Kadastrdagi umumiy maydon (га)</th>
+          <th style="text-align: right;">Chizilgan maydon (га)</th>
+          <th style="text-align: right;">Kadastir + chizilgan</th>
+          <th style="text-align: right;">6-shaklda ko'rsatilgan maydon (га)</th>
+          <th style="text-align: right;">Farq</th>
+        </tr>
+      </thead>
+      <tbody id="tb">
+        <tr><td colspan="8" class="loading">Yuklanmoqda...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="pagination" id="pag"></div>
+
+<script>
+const API = '/api/agri-land-tins';
+let STATE = { page: 1, limit: 50, pages: 1, total: 0, tin: '', soato: '', totals: null };
+
+const fmt = n => Number(n || 0).toLocaleString('uz-UZ', { maximumFractionDigits: 2 });
+const fmtInt = n => Number(n || 0).toLocaleString('uz-UZ');
+
+async function load() {
+  const params = new URLSearchParams({
+    page: STATE.page,
+    limit: STATE.limit,
+  });
+  if (STATE.tin)   params.set('tin', STATE.tin);
+  if (STATE.soato) params.set('soato', STATE.soato);
+
+  const r = await fetch(`${API}/tin-soato-pairs?${params}`);
+  const data = await r.json();
+
+  STATE.pages = data.pages;
+  STATE.total = data.total;
+  STATE.totals = data.totals;
+
+  render(data.items, (STATE.page - 1) * STATE.limit);
+  renderPag();
+  document.getElementById('result-info').textContent =
+    `Jami: ${fmtInt(data.total)} · Sahifa ${data.page}/${data.pages}`;
+}
+
+function render(items, offset) {
+  const tb = document.getElementById('tb');
+  if (!items.length) {
+    tb.innerHTML = '<tr><td colspan="8" class="loading">Ma\'lumot topilmadi</td></tr>';
+    return;
+  }
+  const rows = items.map((it, i) => `
+    <tr>
+      <td>${offset + i + 1}</td>
+      <td style="background:#F9DC5C">${it.tin || '<span class="muted">—</span>'}</td>
+      <td>${it.soato || '<span class="muted">—</span>'}</td>
+      <td class="num">${fmt(it.gis_area_ha_total)}</td>
+      <td class="num">${fmt(it.arable_area_size_total)}</td>
+      <td class="num">${fmt((it.gis_area_ha_total || 0) + (it.arable_area_size_total || 0))}</td>
+      <td class="num">${fmt(it.total_land_area)}</td>
+      <td class="num">${fmt(((it.gis_area_ha_total || 0) + (it.arable_area_size_total || 0)) - (it.total_land_area || 0))}</td>
+    </tr>
+  `).join('');
+
+  const t = STATE.totals || {};
+  const totalRow = `
+    <tr style="font-weight:700; background:#eef1ff;">
+      <td colspan="3">Jami (filter bo'yicha)</td>
+      <td class="num">${fmt(t.gis_area_ha_total)}</td>
+      <td class="num">${fmt(t.arable_area_size_total)}</td>
+      <td class="num">${fmt((t.gis_area_ha_total || 0) + (t.arable_area_size_total || 0))}</td>
+      <td class="num">${fmt(t.total_land_area)}</td>
+      <td class="num">
+        <span style="color:#e55">${fmt(t.neg_diff)}</span>
+        &nbsp;/&nbsp;
+        <span style="color:#2a9d3f">+${fmt(t.pos_diff)}</span>
+      </td>
+    </tr>
+  `;
+
+  tb.innerHTML = rows + totalRow;
+}
+
+function renderPag() {
+  const pag = document.getElementById('pag');
+  const { page, pages } = STATE;
+  pag.innerHTML = `
+    <button onclick="goPage(1)" ${page <= 1 ? 'disabled' : ''}>«</button>
+    <button onclick="goPage(${page - 1})" ${page <= 1 ? 'disabled' : ''}>‹ Oldingi</button>
+    <span class="info">Sahifa</span>
+    <input type="number" min="1" max="${pages}" value="${page}" onchange="goPage(+this.value)" />
+    <span class="info">/ ${pages}</span>
+    <button onclick="goPage(${page + 1})" ${page >= pages ? 'disabled' : ''}>Keyingi ›</button>
+    <button onclick="goPage(${pages})" ${page >= pages ? 'disabled' : ''}>»</button>
+  `;
+}
+
+function goPage(p) {
+  p = Math.max(1, Math.min(STATE.pages, p | 0));
+  if (p === STATE.page) return;
+  STATE.page = p;
+  load();
+}
+
+function applyFilter() {
+  STATE.tin   = document.getElementById('tin-input').value.trim();
+  STATE.soato = document.getElementById('soato-input').value.trim();
+  STATE.limit = +document.getElementById('limit').value || 50;
+  STATE.page  = 1;
+  load();
+}
+
+function clearFilter() {
+  document.getElementById('tin-input').value = '';
+  document.getElementById('soato-input').value = '';
+  STATE.tin = ''; STATE.soato = ''; STATE.page = 1;
+  load();
+}
+
+document.getElementById('tin-input').addEventListener('keydown', e => { if (e.key === 'Enter') applyFilter(); });
+document.getElementById('soato-input').addEventListener('keydown', e => { if (e.key === 'Enter') applyFilter(); });
+document.getElementById('limit').addEventListener('change', applyFilter);
+
+document.getElementById('export-btn').addEventListener('click', async () => {
+  const btn = document.getElementById('export-btn');
+  const origText = btn.textContent;
+  btn.disabled = true;
+
+  const items = [];
+  let page = 1;
+  const limit = 500;
+  let totalPages = 1;
+  let totals = null;
+
+  do {
+    btn.textContent = `Yuklanmoqda... ${items.length}`;
+    const params = new URLSearchParams({ page, limit, all: 1 });
+    const r = await fetch(`${API}/tin-soato-pairs?${params}`);
+    const data = await r.json();
+    items.push(...(data.items || []));
+    totalPages = data.pages;
+    totals = data.totals;
+    page++;
+  } while (page <= totalPages);
+
+  const header = ['#','TIN','SOATO','Kadastrdagi umumiy maydon (ga)','Chizilgan maydon (ga)','Kadastir + chizilgan','6-shaklda ko\'rsatilgan maydon (ga)','Farq'];
+  const rows = items.map((it, i) => {
+    const gis = +(it.gis_area_ha_total || 0);
+    const arable = +(it.arable_area_size_total || 0);
+    const land = +(it.total_land_area || 0);
+    return [ i + 1, it.tin || '', it.soato || '', gis, arable, gis + arable, land, (gis + arable) - land ];
+  });
+
+  const t = totals || {};
+  const tGis = t.gis_area_ha_total || 0;
+  const tArable = t.arable_area_size_total || 0;
+  const tLand = t.total_land_area || 0;
+  const totalRow = ['Jami','','', tGis, tArable, tGis + tArable, tLand, (tGis + tArable) - tLand];
+
+  const ws = XLSX.utils.aoa_to_sheet([header, ...rows, totalRow]);
+  ws['!cols'] = [{wch:7},{wch:14},{wch:12},{wch:26},{wch:22},{wch:22},{wch:30},{wch:18}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'TIN-SOATO');
+  const ts = new Date().toISOString().slice(0,10);
+  XLSX.writeFile(wb, `tin-soato-pairs-${ts}.xlsx`);
+
+  btn.disabled = false;
+  btn.textContent = origText;
+});
+
+load();
+</script>
+</body>
+</html>
