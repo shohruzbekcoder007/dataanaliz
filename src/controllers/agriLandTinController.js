@@ -3,6 +3,789 @@ const HokimyatAgriLandMat = require('../models/HokimyatAgriLandMat');
 const KattaTashkilotlarReport = require('../models/KattaTashkilotlarReport');
 const TinSoatoPairs = require('../models/TinSoatoPairs');
 
+// Qo'ng'irot tumani — to'liq tahlil
+exports.qungirotAnalysis = async (req, res) => {
+  const TUMAN = '1735215';
+  const TUMAN_NUM = 1735215;
+  const VILOYAT = '1735';
+  const db = require('mongoose').connection.db;
+
+  const aglCol = db.collection('agri_land_full');
+  const sixCol = db.collection('six_shapes');
+  const defCol = db.collection('defined_arable_lands');
+  const tspCol = db.collection('tin_soato_pairs');
+  const hamCol = db.collection('hokimyat_agri_land_mat');
+  const fiveCol = db.collection('five_shapes');
+  const ijaraCol = db.collection('ijara');
+  const reserveCol = db.collection('reserve_land_clean_remainder');
+
+  const aglMatch = { tuman_code: TUMAN };
+  const sixMatch = { soato: TUMAN_NUM };
+  const defMatch = { tuman_soato: TUMAN };
+  const tspMatch = { soato: TUMAN };
+
+  const num = (x) => ({ $convert: { input: x, to: 'double', onError: 0, onNull: 0 } });
+
+  const [
+    aglOverall, aglByCategory, aglByType, aglByProperty, aglByTenancy,
+    aglByMahalla, aglTopTins, aglIsActive, aglRemoved, aglComparison,
+    sixOverall, sixByCategory, sixByType, sixTopOrgs, sixByProperty,
+    defOverall, defByFieldCat, defByGroundSrc, defByMahalla,
+    tspOverall, tspTopTins,
+    hamCount, fiveCount, ijaraCount, reserveCount,
+    aglFiveShapeStats,
+    reserveOverall, reserveByProperty, reserveByBaUnit, reserveByMahalla, reserveByAuction, reserveTop,
+  ] = await Promise.all([
+    // 1. agri_land_full overall
+    aglCol.aggregate([
+      { $match: aglMatch },
+      { $group: {
+        _id: null,
+        count: { $sum: 1 },
+        total_area: { $sum: num('$gis_area_ha') },
+        unique_tins: { $addToSet: '$tin' },
+        unique_cadastrals: { $addToSet: '$cadastral_number' },
+        unique_mahallas: { $addToSet: '$mahalla_name' },
+      }},
+      { $project: {
+        count: 1, total_area: 1,
+        tin_count: { $size: '$unique_tins' },
+        cadastral_count: { $size: '$unique_cadastrals' },
+        mahalla_count: { $size: '$unique_mahallas' },
+      }},
+    ]).toArray(),
+
+    // 2. By land_fund_category
+    aglCol.aggregate([
+      { $match: aglMatch },
+      { $group: { _id: { code: '$land_fund_category', desc: '$land_fund_category_description' },
+                  count: { $sum: 1 }, area: { $sum: num('$gis_area_ha') } }},
+      { $sort: { area: -1 } },
+    ]).toArray(),
+
+    // 3. By land_fund_type
+    aglCol.aggregate([
+      { $match: aglMatch },
+      { $group: { _id: { code: '$land_fund_type', desc: '$land_fund_type_description' },
+                  count: { $sum: 1 }, area: { $sum: num('$gis_area_ha') } }},
+      { $sort: { area: -1 } },
+      { $limit: 30 },
+    ]).toArray(),
+
+    // 4. By property_kind
+    aglCol.aggregate([
+      { $match: aglMatch },
+      { $group: { _id: '$property_kind', count: { $sum: 1 }, area: { $sum: num('$gis_area_ha') } }},
+      { $sort: { area: -1 } },
+    ]).toArray(),
+
+    // 5. By tenancy_type_code
+    aglCol.aggregate([
+      { $match: aglMatch },
+      { $group: { _id: '$tenancy_type_code', count: { $sum: 1 }, area: { $sum: num('$gis_area_ha') } }},
+      { $sort: { area: -1 } },
+    ]).toArray(),
+
+    // 6. By mahalla
+    aglCol.aggregate([
+      { $match: aglMatch },
+      { $group: { _id: '$mahalla_name', count: { $sum: 1 }, area: { $sum: num('$gis_area_ha') },
+                  tins: { $addToSet: '$tin' } }},
+      { $project: { count: 1, area: 1, tin_count: { $size: '$tins' } }},
+      { $sort: { area: -1 } },
+    ]).toArray(),
+
+    // 7. Top TINs by area
+    aglCol.aggregate([
+      { $match: aglMatch },
+      { $group: { _id: '$tin', count: { $sum: 1 }, area: { $sum: num('$gis_area_ha') },
+                  owner: { $first: '$owner_full_name' } }},
+      { $sort: { area: -1 } },
+      { $limit: 20 },
+    ]).toArray(),
+
+    // 8. is_active distribution
+    aglCol.aggregate([
+      { $match: aglMatch },
+      { $group: { _id: '$is_active', count: { $sum: 1 }, area: { $sum: num('$gis_area_ha') } }},
+    ]).toArray(),
+
+    // 9. removed_by_qx
+    aglCol.aggregate([
+      { $match: aglMatch },
+      { $group: { _id: '$removed_by_qx', count: { $sum: 1 }, area: { $sum: num('$gis_area_ha') } }},
+    ]).toArray(),
+
+    // 10. compare_cadastral_and_report_shape stats
+    aglCol.aggregate([
+      { $match: aglMatch },
+      { $group: { _id: '$compare_cadastral_and_report_shape', count: { $sum: 1 },
+                  diff_sum: { $sum: num('$compare_cadastral_and_report_shape_diff') } }},
+    ]).toArray(),
+
+    // 11. six_shapes overall
+    sixCol.aggregate([
+      { $match: sixMatch },
+      { $group: {
+        _id: null,
+        count: { $sum: 1 },
+        organizations: { $addToSet: '$organization_inn' },
+        total_land_area: { $sum: num('$total_land_area') },
+        agricultural_land_total: { $sum: num('$agricultural_land_total') },
+        arable_land: { $sum: num('$arable_land') },
+        sown_area: { $sum: num('$sown_area') },
+        greenhouse_land_area: { $sum: num('$greenhouse_land_area') },
+        subleased_land_area: { $sum: num('$subleased_land_area') },
+        leased_out_land_area: { $sum: num('$leased_out_land_area') },
+      }},
+      { $project: {
+        count: 1, total_land_area: 1, agricultural_land_total: 1, arable_land: 1,
+        sown_area: 1, greenhouse_land_area: 1, subleased_land_area: 1, leased_out_land_area: 1,
+        org_count: { $size: '$organizations' },
+      }},
+    ]).toArray(),
+
+    // 12. six by category
+    sixCol.aggregate([
+      { $match: sixMatch },
+      { $group: { _id: { code: '$land_fund_category', desc: '$land_fund_category_description' },
+                  count: { $sum: 1 }, area: { $sum: num('$total_land_area') } }},
+      { $sort: { area: -1 } },
+    ]).toArray(),
+
+    // 13. six by type
+    sixCol.aggregate([
+      { $match: sixMatch },
+      { $group: { _id: { code: '$land_fund_type', desc: '$land_fund_type_description' },
+                  count: { $sum: 1 }, area: { $sum: num('$total_land_area') } }},
+      { $sort: { area: -1 } },
+      { $limit: 30 },
+    ]).toArray(),
+
+    // 14. Top organizations by area
+    sixCol.aggregate([
+      { $match: sixMatch },
+      { $group: { _id: '$organization_inn',
+                  name: { $first: '$organization_name' },
+                  count: { $sum: 1 },
+                  total_land_area: { $sum: num('$total_land_area') },
+                  agricultural: { $sum: num('$agricultural_land_total') },
+                  arable: { $sum: num('$arable_land') },
+                  sown: { $sum: num('$sown_area') } }},
+      { $sort: { total_land_area: -1 } },
+      { $limit: 20 },
+    ]).toArray(),
+
+    // 15. six by property_kind / status
+    sixCol.aggregate([
+      { $match: sixMatch },
+      { $group: { _id: '$status_name', count: { $sum: 1 }, area: { $sum: num('$total_land_area') } }},
+      { $sort: { area: -1 } },
+    ]).toArray(),
+
+    // 16. defined_arable_lands overall
+    defCol.aggregate([
+      { $match: defMatch },
+      { $group: {
+        _id: null,
+        count: { $sum: 1 },
+        total_area: { $sum: num('$area_size') },
+        unique_tins: { $addToSet: '$tin_or_jshshr' },
+        unique_mahallas: { $addToSet: '$mahalla_tin' },
+        fell_count: { $sum: { $cond: ['$fell_on_top_of_each_other', 1, 0] } },
+      }},
+      { $project: {
+        count: 1, total_area: 1, fell_count: 1,
+        tin_count: { $size: '$unique_tins' },
+        mahalla_count: { $size: '$unique_mahallas' },
+      }},
+    ]).toArray(),
+
+    // 17. defined by field_category (1,2,3)
+    defCol.aggregate([
+      { $match: defMatch },
+      { $group: { _id: '$field_category', count: { $sum: 1 }, area: { $sum: num('$area_size') } }},
+      { $sort: { _id: 1 } },
+    ]).toArray(),
+
+    // 18. defined by ground_source (1-9)
+    defCol.aggregate([
+      { $match: defMatch },
+      { $group: { _id: '$ground_source', count: { $sum: 1 }, area: { $sum: num('$area_size') } }},
+      { $sort: { _id: 1 } },
+    ]).toArray(),
+
+    // 19. defined by mahalla
+    defCol.aggregate([
+      { $match: defMatch },
+      { $group: { _id: '$mahalla_tin', count: { $sum: 1 }, area: { $sum: num('$area_size') } }},
+      { $sort: { area: -1 } },
+    ]).toArray(),
+
+    // 20. tin_soato_pairs overall
+    tspCol.aggregate([
+      { $match: tspMatch },
+      { $group: { _id: null, count: { $sum: 1 },
+                  total_land_area: { $sum: num('$total_land_area') },
+                  gis_area_ha_total: { $sum: num('$gis_area_ha_total') },
+                  arable_area_size_total: { $sum: num('$arable_area_size_total') },
+                  bergan_total: { $sum: num('$bergan_total') },
+                  olgan_total: { $sum: num('$olgan_total') } }},
+    ]).toArray(),
+
+    // 21. top tins from tin_soato_pairs
+    tspCol.aggregate([
+      { $match: tspMatch },
+      { $sort: { total_land_area: -1 } },
+      { $limit: 15 },
+    ]).toArray(),
+
+    // 22. hokimyat counts
+    hamCol.countDocuments({ soato7: TUMAN }),
+    fiveCol.countDocuments({ tuman_code: TUMAN }).catch(() => 0),
+    ijaraCol.countDocuments({ tuman_code: TUMAN }).catch(() => ijaraCol.countDocuments({ soato: TUMAN }).catch(() => 0)),
+    reserveCol.countDocuments({ tuman_code: TUMAN }).catch(() => 0),
+
+    // 23. five_shape stats from agri_land_full
+    aglCol.aggregate([
+      { $match: aglMatch },
+      { $group: {
+        _id: null,
+        crop_area: { $sum: num('$five_shape_crop_area') },
+        planted_area: { $sum: num('$five_shape_planted_area') },
+        total_land_area: { $sum: num('$five_shape_total_land_area') },
+        submitted: { $sum: { $cond: ['$submitted_five_shape', 1, 0] } },
+      }},
+    ]).toArray(),
+
+    // 24. reserve_land_clean_remainder overall
+    reserveCol.aggregate([
+      { $match: { tuman_code: TUMAN } },
+      { $group: {
+        _id: null,
+        count: { $sum: 1 },
+        original_area: { $sum: num('$original_gis_area_ha') },
+        clean_area: { $sum: num('$clean_area_ha') },
+        auctioned_area: { $sum: num('$auctioned_area_ha') },
+        active_count: { $sum: { $cond: ['$is_active', 1, 0] } },
+        unique_cadastrals: { $addToSet: '$cadastral_number' },
+        unique_mahallas: { $addToSet: '$mahalla_name' },
+      }},
+      { $project: { count:1, original_area:1, clean_area:1, auctioned_area:1, active_count:1,
+                    cadastral_count: { $size: '$unique_cadastrals' },
+                    mahalla_count: { $size: '$unique_mahallas' } }},
+    ]).toArray(),
+
+    // 25. reserve by property_kind
+    reserveCol.aggregate([
+      { $match: { tuman_code: TUMAN } },
+      { $group: { _id: '$property_kind', count: { $sum: 1 },
+                  original_area: { $sum: num('$original_gis_area_ha') },
+                  clean_area: { $sum: num('$clean_area_ha') },
+                  auctioned_area: { $sum: num('$auctioned_area_ha') } }},
+      { $sort: { clean_area: -1 } },
+    ]).toArray(),
+
+    // 26. reserve by ba_unit_type
+    reserveCol.aggregate([
+      { $match: { tuman_code: TUMAN } },
+      { $group: { _id: '$ba_unit_type', count: { $sum: 1 },
+                  clean_area: { $sum: num('$clean_area_ha') } }},
+      { $sort: { clean_area: -1 } },
+    ]).toArray(),
+
+    // 27. reserve by mahalla
+    reserveCol.aggregate([
+      { $match: { tuman_code: TUMAN } },
+      { $group: { _id: '$mahalla_name', count: { $sum: 1 },
+                  original_area: { $sum: num('$original_gis_area_ha') },
+                  clean_area: { $sum: num('$clean_area_ha') },
+                  auctioned_area: { $sum: num('$auctioned_area_ha') } }},
+      { $sort: { clean_area: -1 } },
+    ]).toArray(),
+
+    // 28. reserve auction breakdown
+    reserveCol.aggregate([
+      { $match: { tuman_code: TUMAN } },
+      { $bucket: {
+        groupBy: { $convert: { input: '$auctioned_percentage', to: 'double', onError: 0, onNull: 0 } },
+        boundaries: [0, 0.0001, 25, 50, 75, 99.9999, 100.0001],
+        default: 'other',
+        output: { count: { $sum: 1 }, area: { $sum: num('$clean_area_ha') } },
+      }},
+    ]).toArray(),
+
+    // 29. top 30 reserve parcels
+    reserveCol.find({ tuman_code: TUMAN })
+      .project({ cadastral_number:1, parcel_id:1, mahalla_name:1, property_kind:1, ba_unit_type:1,
+                 original_gis_area_ha:1, clean_area_ha:1, auctioned_area_ha:1, auctioned_percentage:1, is_active:1 })
+      .sort({ clean_area_ha: -1 }).limit(30).toArray(),
+  ]);
+
+  res.json({
+    tuman: { soato: TUMAN, viloyat: VILOYAT, name: "Qo'ng'irot tumani" },
+    counts: {
+      hokimyat_mat: hamCount,
+      five_shapes: fiveCount,
+      ijara: ijaraCount,
+      reserve: reserveCount,
+    },
+    reserve_land: {
+      overall: reserveOverall[0] || {},
+      by_property: reserveByProperty,
+      by_ba_unit: reserveByBaUnit,
+      by_mahalla: reserveByMahalla,
+      by_auction: reserveByAuction,
+      top: reserveTop,
+    },
+    agri_land_full: {
+      overall: aglOverall[0] || {},
+      by_category: aglByCategory,
+      by_type: aglByType,
+      by_property: aglByProperty,
+      by_tenancy: aglByTenancy,
+      by_mahalla: aglByMahalla,
+      top_tins: aglTopTins,
+      is_active: aglIsActive,
+      removed_by_qx: aglRemoved,
+      cadastral_comparison: aglComparison,
+      five_shape_stats: aglFiveShapeStats[0] || {},
+    },
+    six_shapes: {
+      overall: sixOverall[0] || {},
+      by_category: sixByCategory,
+      by_type: sixByType,
+      top_organizations: sixTopOrgs,
+      by_status: sixByProperty,
+    },
+    defined_arable_lands: {
+      overall: defOverall[0] || {},
+      by_field_category: defByFieldCat,
+      by_ground_source: defByGroundSrc,
+      by_mahalla: defByMahalla,
+    },
+    tin_soato_pairs: {
+      overall: tspOverall[0] || {},
+      top_tins: tspTopTins,
+    },
+  });
+};
+
+// Qo'ng'irot kadastrlar ro'yxati (filterli/filtersiz) — TIN 201039878 birinchi
+exports.qungirotCadastrals = async (req, res) => {
+  const TUMAN = '1735215';
+  const HOKIMYAT_TIN = '201039878';
+  const filtered = req.query.filtered === '1' || req.query.filtered === 'true';
+  const page  = Math.max(1, parseInt(req.query.page, 10)  || 1);
+  const limit = Math.min(500, Math.max(1, parseInt(req.query.limit, 10) || 50));
+  const skip  = (page - 1) * limit;
+
+  const db = require('mongoose').connection.db;
+  const col = db.collection('agri_land_full');
+  const num = (x) => ({ $convert: { input: x, to: 'double', onError: 0, onNull: 0 } });
+
+  const baseMatch = { tuman_code: TUMAN, is_active: true };
+
+  const filterMatch = filtered ? {
+    tuman_code: TUMAN,
+    is_active: true,
+    removed_by_qx: false,
+    $expr: { $ne: [{ $strLenCP: { $ifNull: [{ $toString: '$tin' }, ''] } }, 14] },
+    $or: [
+      { land_fund_category: { $nin: ['006002', '006007', '006005', '006008', null, ''] } },
+      { land_fund_category: '006008', tin: { $ne: null } },
+    ],
+    land_fund_type: { $nin: [
+      '006001007020','006003006000','006003002002','006003001006','006003001005',
+      '006003003000','006003001003','006003001002','006003002001','006003001004',
+      '006003002005','006003004000','006003002003','006003001001','006003002004',
+    ]},
+    property_kind: { $nin: ['prop_kind_reserve'], $not: /^prop_kind_land_lease/ },
+  } : baseMatch;
+
+  // Hokimyat TIN birinchi — sort key
+  const sortPipeline = [
+    { $match: filterMatch },
+    { $addFields: {
+        _sortKey: { $cond: [{ $or: [
+          { $eq: ['$tin', HOKIMYAT_TIN] },
+          { $eq: ['$tin', Number(HOKIMYAT_TIN)] },
+        ]}, 0, 1] }
+    }},
+    { $sort: { _sortKey: 1, gis_area_ha: -1 } },
+  ];
+
+  const [total, items, totals, hokimyatCount] = await Promise.all([
+    col.countDocuments(filterMatch),
+    col.aggregate([
+      ...sortPipeline,
+      { $skip: skip }, { $limit: limit },
+      { $project: {
+          cadastral_number: 1, tin: 1, owner_full_name: 1,
+          land_fund_category: 1, land_fund_category_description: 1,
+          land_fund_type: 1, land_fund_type_description: 1,
+          property_kind: 1, tenancy_type_code: 1,
+          gis_area_ha: 1, mahalla_name: 1,
+          is_active: 1, removed_by_qx: 1,
+      }},
+    ]).toArray(),
+    col.aggregate([
+      { $match: filterMatch },
+      { $group: {
+          _id: null, count: { $sum: 1 }, area: { $sum: num('$gis_area_ha') },
+          tins: { $addToSet: '$tin' },
+          cadastrals: { $addToSet: '$cadastral_number' },
+      }},
+      { $project: { count:1, area:1,
+                    tin_count: { $size: '$tins' },
+                    cadastral_count: { $size: '$cadastrals' } }},
+    ]).toArray(),
+    col.countDocuments({ ...filterMatch, $or: [{ tin: HOKIMYAT_TIN }, { tin: Number(HOKIMYAT_TIN) }] }),
+  ]);
+
+  res.json({
+    filtered, page, limit, total,
+    pages: Math.ceil(total / limit) || 1,
+    totals: totals[0] || { count: 0, area: 0, tin_count: 0, cadastral_count: 0 },
+    hokimyat_count: hokimyatCount,
+    items,
+  });
+};
+
+// Qo'ng'irot kadastrlar — filterli vs filtersiz solishtirish
+exports.qungirotCadastralsCompare = async (req, res) => {
+  const TUMAN = '1735215';
+  const HOKIMYAT_TIN = '201039878';
+  const db = require('mongoose').connection.db;
+  const col = db.collection('agri_land_full');
+  const num = (x) => ({ $convert: { input: x, to: 'double', onError: 0, onNull: 0 } });
+
+  const baseMatch = { tuman_code: TUMAN, is_active: true };
+  const filterMatch = {
+    tuman_code: TUMAN,
+    is_active: true,
+    removed_by_qx: false,
+    $expr: { $ne: [{ $strLenCP: { $ifNull: [{ $toString: '$tin' }, ''] } }, 14] },
+    $or: [
+      { land_fund_category: { $nin: ['006002', '006007', '006005', '006008', null, ''] } },
+      { land_fund_category: '006008', tin: { $ne: null } },
+    ],
+    land_fund_type: { $nin: [
+      '006001007020','006003006000','006003002002','006003001006','006003001005',
+      '006003003000','006003001003','006003001002','006003002001','006003001004',
+      '006003002005','006003004000','006003002003','006003001001','006003002004',
+    ]},
+    property_kind: { $nin: ['prop_kind_reserve'], $not: /^prop_kind_land_lease/ },
+  };
+
+  const stats = (match) => col.aggregate([
+    { $match: match },
+    { $group: {
+        _id: null, count: { $sum: 1 }, area: { $sum: num('$gis_area_ha') },
+        tins: { $addToSet: '$tin' },
+        cadastrals: { $addToSet: '$cadastral_number' },
+        hokimyat_count: { $sum: { $cond: [{ $or: [
+          { $eq: ['$tin', HOKIMYAT_TIN] },
+          { $eq: ['$tin', Number(HOKIMYAT_TIN)] },
+        ]}, 1, 0] } },
+        hokimyat_area: { $sum: { $cond: [{ $or: [
+          { $eq: ['$tin', HOKIMYAT_TIN] },
+          { $eq: ['$tin', Number(HOKIMYAT_TIN)] },
+        ]}, num('$gis_area_ha'), 0] } },
+    }},
+    { $project: { count:1, area:1, hokimyat_count:1, hokimyat_area:1,
+                  tin_count: { $size: '$tins' }, cadastral_count: { $size: '$cadastrals' } }},
+  ]).toArray();
+
+  const reasonsAgg = col.aggregate([
+    { $match: baseMatch },
+    { $facet: {
+        not_active: [
+          { $match: { is_active: { $ne: true } } },
+          { $group: { _id: null, count: { $sum: 1 }, area: { $sum: num('$gis_area_ha') } }},
+        ],
+        removed: [
+          { $match: { removed_by_qx: true } },
+          { $group: { _id: null, count: { $sum: 1 }, area: { $sum: num('$gis_area_ha') } }},
+        ],
+        tin14: [
+          { $match: { $expr: { $eq: [{ $strLenCP: { $ifNull: [{ $toString: '$tin' }, ''] } }, 14] } } },
+          { $group: { _id: null, count: { $sum: 1 }, area: { $sum: num('$gis_area_ha') } }},
+        ],
+        excluded_categories: [
+          { $match: { land_fund_category: { $in: ['006002', '006007', '006005'] } } },
+          { $group: { _id: '$land_fund_category', count: { $sum: 1 }, area: { $sum: num('$gis_area_ha') } }},
+        ],
+        cat_006008_no_tin: [
+          { $match: { land_fund_category: '006008', tin: null } },
+          { $group: { _id: null, count: { $sum: 1 }, area: { $sum: num('$gis_area_ha') } }},
+        ],
+        excluded_types: [
+          { $match: { land_fund_type: { $in: [
+            '006001007020','006003006000','006003002002','006003001006','006003001005',
+            '006003003000','006003001003','006003001002','006003002001','006003001004',
+            '006003002005','006003004000','006003002003','006003001001','006003002004',
+          ]}}},
+          { $group: { _id: '$land_fund_type', count: { $sum: 1 }, area: { $sum: num('$gis_area_ha') } }},
+          { $sort: { count: -1 } },
+        ],
+        prop_reserve: [
+          { $match: { property_kind: 'prop_kind_reserve' } },
+          { $group: { _id: null, count: { $sum: 1 }, area: { $sum: num('$gis_area_ha') } }},
+        ],
+        prop_lease: [
+          { $match: { property_kind: { $regex: '^prop_kind_land_lease' } } },
+          { $group: { _id: null, count: { $sum: 1 }, area: { $sum: num('$gis_area_ha') } }},
+        ],
+    }},
+  ]).toArray();
+
+  const [base, filt, reasons] = await Promise.all([stats(baseMatch), stats(filterMatch), reasonsAgg]);
+
+  res.json({
+    base: base[0] || {},
+    filtered: filt[0] || {},
+    reasons: reasons[0] || {},
+  });
+};
+
+// TIN bo'yicha chuqur tahlil
+exports.tinDeepAnalysis = async (req, res) => {
+  const tin = String(req.params.tin || '').trim();
+  if (!tin) return res.status(400).json({ error: 'tin is required' });
+
+  const db = require('mongoose').connection.db;
+  const aglCol = db.collection('agri_land_full');
+  const sixCol = db.collection('six_shapes');
+  const defCol = db.collection('defined_arable_lands');
+  const tspCol = db.collection('tin_soato_pairs');
+  const ijaraCol = db.collection('ijara');
+  const num = (x) => ({ $convert: { input: x, to: 'double', onError: 0, onNull: 0 } });
+
+  const tinNum = Number(tin);
+  const tinAny = isNaN(tinNum) ? [tin] : [tin, tinNum];
+
+  const [
+    aglOverall, aglByCat, aglByType, aglByProp, aglByTen, aglByTuman, aglByMahalla, aglRecords,
+    sixOverall, sixByCat, sixByType, sixByStatus, sixRecords,
+    defOverall, defByFieldCat, defByGroundSrc, defRecords,
+    tspBySoato, tspOverall,
+    ijaraGiven, ijaraTaken,
+  ] = await Promise.all([
+    aglCol.aggregate([
+      { $match: { tin: { $in: tinAny } } },
+      { $group: {
+          _id: null,
+          count: { $sum: 1 },
+          area: { $sum: num('$gis_area_ha') },
+          owners: { $addToSet: '$owner_full_name' },
+          mahallas: { $addToSet: '$mahalla_name' },
+          tumans: { $addToSet: { code: '$tuman_code', name: '$tuman_name' } },
+          viloyats: { $addToSet: { code: '$viloyat_code', name: '$viloyat_name' } },
+          cadastrals: { $addToSet: '$cadastral_number' },
+          active_count: { $sum: { $cond: ['$is_active', 1, 0] } },
+          removed_count: { $sum: { $cond: ['$removed_by_qx', 1, 0] } },
+          tin_total_gis: { $first: '$tin_total_gis_area_ha' },
+      }},
+      { $project: {
+          count: 1, area: 1, owners: 1, tin_total_gis: 1,
+          mahalla_count: { $size: '$mahallas' },
+          tuman_count: { $size: '$tumans' },
+          viloyat_count: { $size: '$viloyats' },
+          cadastral_count: { $size: '$cadastrals' },
+          active_count: 1, removed_count: 1,
+          tumans: 1, viloyats: 1,
+      }},
+    ]).toArray(),
+
+    aglCol.aggregate([
+      { $match: { tin: { $in: tinAny } } },
+      { $group: { _id: { code: '$land_fund_category', desc: '$land_fund_category_description' },
+                  count: { $sum: 1 }, area: { $sum: num('$gis_area_ha') } }},
+      { $sort: { area: -1 } },
+    ]).toArray(),
+
+    aglCol.aggregate([
+      { $match: { tin: { $in: tinAny } } },
+      { $group: { _id: { code: '$land_fund_type', desc: '$land_fund_type_description' },
+                  count: { $sum: 1 }, area: { $sum: num('$gis_area_ha') } }},
+      { $sort: { area: -1 } },
+    ]).toArray(),
+
+    aglCol.aggregate([
+      { $match: { tin: { $in: tinAny } } },
+      { $group: { _id: '$property_kind', count: { $sum: 1 }, area: { $sum: num('$gis_area_ha') } }},
+      { $sort: { area: -1 } },
+    ]).toArray(),
+
+    aglCol.aggregate([
+      { $match: { tin: { $in: tinAny } } },
+      { $group: { _id: '$tenancy_type_code', count: { $sum: 1 }, area: { $sum: num('$gis_area_ha') } }},
+      { $sort: { area: -1 } },
+    ]).toArray(),
+
+    aglCol.aggregate([
+      { $match: { tin: { $in: tinAny } } },
+      { $group: { _id: { code: '$tuman_code', name: '$tuman_name' },
+                  count: { $sum: 1 }, area: { $sum: num('$gis_area_ha') } }},
+      { $sort: { area: -1 } },
+    ]).toArray(),
+
+    aglCol.aggregate([
+      { $match: { tin: { $in: tinAny } } },
+      { $group: { _id: '$mahalla_name', count: { $sum: 1 }, area: { $sum: num('$gis_area_ha') },
+                  tuman: { $first: '$tuman_name' } }},
+      { $sort: { area: -1 } },
+      { $limit: 50 },
+    ]).toArray(),
+
+    aglCol.find({ tin: { $in: tinAny } })
+      .project({ cadastral_number: 1, land_fund_category: 1, land_fund_type: 1, gis_area_ha: 1,
+                 property_kind: 1, tenancy_type_code: 1, tuman_name: 1, mahalla_name: 1,
+                 is_active: 1, removed_by_qx: 1 })
+      .sort({ gis_area_ha: -1 }).limit(50).toArray(),
+
+    sixCol.aggregate([
+      { $match: { organization_inn: { $in: tinAny } } },
+      { $group: {
+          _id: null,
+          count: { $sum: 1 },
+          name: { $first: '$organization_name' },
+          total_land_area: { $sum: num('$total_land_area') },
+          agricultural: { $sum: num('$agricultural_land_total') },
+          arable: { $sum: num('$arable_land') },
+          sown: { $sum: num('$sown_area') },
+          greenhouse: { $sum: num('$greenhouse_land_area') },
+          subleased: { $sum: num('$subleased_land_area') },
+          leased_out: { $sum: num('$leased_out_land_area') },
+          soatos: { $addToSet: '$soato' },
+      }},
+      { $project: { count:1, name:1, total_land_area:1, agricultural:1, arable:1, sown:1,
+                    greenhouse:1, subleased:1, leased_out:1,
+                    soato_count: { $size: '$soatos' }, soatos: 1 }},
+    ]).toArray(),
+
+    sixCol.aggregate([
+      { $match: { organization_inn: { $in: tinAny } } },
+      { $group: { _id: { code: '$land_fund_category', desc: '$land_fund_category_description' },
+                  count: { $sum: 1 }, area: { $sum: num('$total_land_area') } }},
+      { $sort: { area: -1 } },
+    ]).toArray(),
+
+    sixCol.aggregate([
+      { $match: { organization_inn: { $in: tinAny } } },
+      { $group: { _id: { code: '$land_fund_type', desc: '$land_fund_type_description' },
+                  count: { $sum: 1 }, area: { $sum: num('$total_land_area') } }},
+      { $sort: { area: -1 } },
+    ]).toArray(),
+
+    sixCol.aggregate([
+      { $match: { organization_inn: { $in: tinAny } } },
+      { $group: { _id: '$status_name', count: { $sum: 1 }, area: { $sum: num('$total_land_area') } }},
+    ]).toArray(),
+
+    sixCol.find({ organization_inn: { $in: tinAny } })
+      .project({ soato: 1, total_land_area: 1, agricultural_land_total: 1, arable_land: 1,
+                 sown_area: 1, land_fund_type: 1, land_fund_type_description: 1, status_name: 1 })
+      .sort({ total_land_area: -1 }).limit(50).toArray(),
+
+    defCol.aggregate([
+      { $match: { tin_or_jshshr: { $in: tinAny.map(String) } } },
+      { $group: {
+          _id: null,
+          count: { $sum: 1 },
+          area: { $sum: num('$area_size') },
+          mahallas: { $addToSet: '$mahalla_tin' },
+          tumans: { $addToSet: '$tuman_soato' },
+          fell_count: { $sum: { $cond: ['$fell_on_top_of_each_other', 1, 0] } },
+      }},
+      { $project: { count:1, area:1, fell_count:1,
+                    mahalla_count: { $size: '$mahallas' },
+                    tuman_count: { $size: '$tumans' } }},
+    ]).toArray(),
+
+    defCol.aggregate([
+      { $match: { tin_or_jshshr: { $in: tinAny.map(String) } } },
+      { $group: { _id: '$field_category', count: { $sum: 1 }, area: { $sum: num('$area_size') } }},
+      { $sort: { _id: 1 } },
+    ]).toArray(),
+
+    defCol.aggregate([
+      { $match: { tin_or_jshshr: { $in: tinAny.map(String) } } },
+      { $group: { _id: '$ground_source', count: { $sum: 1 }, area: { $sum: num('$area_size') } }},
+      { $sort: { _id: 1 } },
+    ]).toArray(),
+
+    defCol.find({ tin_or_jshshr: { $in: tinAny.map(String) } })
+      .project({ tuman_soato: 1, mahalla_tin: 1, area_size: 1, field_category: 1, ground_source: 1,
+                 fell_on_top_of_each_other: 1, description: 1 })
+      .sort({ area_size: -1 }).limit(50).toArray(),
+
+    tspCol.find({ tin: { $in: tinAny.map(String) } })
+      .sort({ total_land_area: -1 }).toArray(),
+
+    tspCol.aggregate([
+      { $match: { tin: { $in: tinAny.map(String) } } },
+      { $group: {
+          _id: null, count: { $sum: 1 },
+          total_land_area: { $sum: num('$total_land_area') },
+          gis_area_ha_total: { $sum: num('$gis_area_ha_total') },
+          arable_area_size_total: { $sum: num('$arable_area_size_total') },
+          bergan_total: { $sum: num('$bergan_total') },
+          olgan_total: { $sum: num('$olgan_total') },
+          soatos: { $addToSet: '$soato' },
+      }},
+      { $project: { count:1, total_land_area:1, gis_area_ha_total:1, arable_area_size_total:1,
+                    bergan_total:1, olgan_total:1, soato_count: { $size: '$soatos' } }},
+    ]).toArray(),
+
+    ijaraCol.aggregate([
+      { $match: { $or: [{ bergan_inn: { $in: tinAny } }, { bergan_tin: { $in: tinAny } }] } },
+      { $group: { _id: null, count: { $sum: 1 }, area: { $sum: num('$area') } }},
+    ]).toArray().catch(() => []),
+
+    ijaraCol.aggregate([
+      { $match: { $or: [{ olgan_inn: { $in: tinAny } }, { olgan_tin: { $in: tinAny } }] } },
+      { $group: { _id: null, count: { $sum: 1 }, area: { $sum: num('$area') } }},
+    ]).toArray().catch(() => []),
+  ]);
+
+  res.json({
+    tin,
+    agri_land_full: {
+      overall: aglOverall[0] || {},
+      by_category: aglByCat,
+      by_type: aglByType,
+      by_property: aglByProp,
+      by_tenancy: aglByTen,
+      by_tuman: aglByTuman,
+      by_mahalla: aglByMahalla,
+      records: aglRecords,
+    },
+    six_shapes: {
+      overall: sixOverall[0] || {},
+      by_category: sixByCat,
+      by_type: sixByType,
+      by_status: sixByStatus,
+      records: sixRecords,
+    },
+    defined_arable_lands: {
+      overall: defOverall[0] || {},
+      by_field_category: defByFieldCat,
+      by_ground_source: defByGroundSrc,
+      records: defRecords,
+    },
+    tin_soato_pairs: {
+      overall: tspOverall[0] || {},
+      records: tspBySoato,
+    },
+    ijara: {
+      given: ijaraGiven[0] || { count: 0, area: 0 },
+      taken: ijaraTaken[0] || { count: 0, area: 0 },
+    },
+  });
+};
+
 // Tin-Soato pairs — pagination + soato/tin filter (native driver)
 exports.tinSoatoPairsList = async (req, res) => {
   const { tin, soato, all } = req.query;

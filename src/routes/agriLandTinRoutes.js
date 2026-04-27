@@ -49,6 +49,16 @@ router.get('/katta-tashkilotlar',   ctrl.kattaTashkilotlarList);
 // Tin-Soato pairs — barcha ma'lumotlar (pagination yo'q)
 router.get('/tin-soato-pairs',      ctrl.tinSoatoPairsList);
 
+// Qo'ng'irot tumani to'liq tahlil
+router.get('/qungirot-analysis',    ctrl.qungirotAnalysis);
+
+// TIN bo'yicha chuqur tahlil
+router.get('/tin-deep/:tin',        ctrl.tinDeepAnalysis);
+
+// Qo'ng'irot kadastrlar list (filterli/filtersiz)
+router.get('/qungirot-cadastrals',  ctrl.qungirotCadastrals);
+router.get('/qungirot-cadastrals/compare', ctrl.qungirotCadastralsCompare);
+
 // Qidiruv — tin bo'yicha
 router.get('/tin/:tin',             ctrl.getByTin);
 
