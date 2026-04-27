@@ -384,7 +384,11 @@ exports.qungirotCadastrals = async (req, res) => {
   const col = db.collection('agri_land_full');
   const num = (x) => ({ $convert: { input: x, to: 'double', onError: 0, onNull: 0 } });
 
-  const baseMatch = { tuman_code: TUMAN, is_active: true };
+  const baseMatch = {
+    tuman_code: TUMAN,
+    is_active: true,
+    property_kind: { $nin: ['prop_kind_reserve'], $not: /^prop_kind_land_lease/ },
+  };
 
   const filterMatch = filtered ? {
     tuman_code: TUMAN,
@@ -460,7 +464,11 @@ exports.qungirotCadastralsCompare = async (req, res) => {
   const col = db.collection('agri_land_full');
   const num = (x) => ({ $convert: { input: x, to: 'double', onError: 0, onNull: 0 } });
 
-  const baseMatch = { tuman_code: TUMAN, is_active: true };
+  const baseMatch = {
+    tuman_code: TUMAN,
+    is_active: true,
+    property_kind: { $nin: ['prop_kind_reserve'], $not: /^prop_kind_land_lease/ },
+  };
   const filterMatch = {
     tuman_code: TUMAN,
     is_active: true,

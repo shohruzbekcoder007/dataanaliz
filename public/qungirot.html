@@ -494,7 +494,7 @@ const GROUND_SRC = {
   await loadTinAnalysis('201039878');
 
   // ====== Cadastrals comparison + lists ======
-  await loadCadCompare();
+  await loadCadCompare(d.reserve_land?.overall);
   await loadCadList(1, 1);
   await loadCadList(2, 1);
   } catch (e) {
@@ -554,7 +554,8 @@ async function loadCadList(listIdx, page) {
   renderPager(`cad-pag-${listIdx}`, page, d.pages, listIdx);
 }
 
-async function loadCadCompare() {
+async function loadCadCompare(reserve) {
+  reserve = reserve || {};
   const r = await fetch('/api/agri-land-tins/qungirot-cadastrals/compare');
   const d = await r.json();
   const root = document.getElementById('cad-compare');
@@ -623,6 +624,23 @@ async function loadCadCompare() {
       </tbody></table>
     </div>`;
   }
+
+  // Reserve land summary card (oxirgi)
+  h += `<div class="card" style="margin-top:14px;background:linear-gradient(135deg,#a04ff7 0%,#7a3fcc 100%);color:#fff">
+    <h3 style="color:#fff">Reserve Land Clean Remainder — Qo'ng'irot tumani</h3>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px">
+      <div><div style="font-size:0.7rem;opacity:.75;text-transform:uppercase;letter-spacing:.05em">Yozuvlar</div>
+           <div style="font-size:1.4rem;font-weight:700">${fmtI(reserve.count)}</div></div>
+      <div><div style="font-size:0.7rem;opacity:.75;text-transform:uppercase;letter-spacing:.05em">Active</div>
+           <div style="font-size:1.4rem;font-weight:700">${fmtI(reserve.active_count)}</div></div>
+      <div><div style="font-size:0.7rem;opacity:.75;text-transform:uppercase;letter-spacing:.05em">Original maydon (ga)</div>
+           <div style="font-size:1.4rem;font-weight:700">${fmt(reserve.original_area)}</div></div>
+      <div><div style="font-size:0.7rem;opacity:.75;text-transform:uppercase;letter-spacing:.05em">Toza qoldiq (ga)</div>
+           <div style="font-size:1.4rem;font-weight:700">${fmt(reserve.clean_area)}</div></div>
+      <div><div style="font-size:0.7rem;opacity:.75;text-transform:uppercase;letter-spacing:.05em">Auksionga chiqarilgan (ga)</div>
+           <div style="font-size:1.4rem;font-weight:700">${fmt(reserve.auctioned_area)}</div></div>
+    </div>
+  </div>`;
 
   if (r2.excluded_types && r2.excluded_types.length) {
     h += `<div class="card" style="margin-top:14px">
