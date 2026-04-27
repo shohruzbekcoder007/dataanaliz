@@ -308,7 +308,7 @@ document.getElementById('export-btn').addEventListener('click', async () => {
     page++;
   } while (page <= totalPages);
 
-  const header = ['#','TIN','SOATO','Kadastrdagi umumiy maydon (ga)','Chizilgan maydon (ga)','Kadastir + chizilgan','6-shaklda ko\'rsatilgan maydon (ga)','Bergan','Olgan','Farq'];
+  const header = ['#','TIN','SOATO','Kadastrdagi umumiy maydon (га)','Chizilgan maydon (га)','Kadastir + chizilgan','6-shaklda ko\'rsatilgan maydon (га)','Bergan','Olgan','Farq'];
   const rows = items.map((it, i) => {
     const gis = +(it.gis_area_ha_total || 0);
     const arable = +(it.arable_area_size_total || 0);
