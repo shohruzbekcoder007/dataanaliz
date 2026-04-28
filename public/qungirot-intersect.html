@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Qo'ng'irot — geometriya kesishuvlari</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background:#f0f2f5; color:#1a1a2e; }
+
+    header { background:#1a1a2e; color:#fff; padding:0 32px; display:flex; align-items:center; gap:32px; height:54px; }
+    header .brand { font-size:1rem; font-weight:700; }
+    nav a { color:rgba(255,255,255,.6); text-decoration:none; font-size:0.88rem; padding:6px 12px; border-radius:6px; }
+    nav a:hover, nav a.active { background:rgba(255,255,255,.12); color:#fff; }
+
+    .page-title { padding:18px 32px 8px; }
+    .page-title h1 { font-size:1.2rem; }
+    .page-title .sub { color:#666; font-size:0.88rem; margin-top:4px; }
+
+    .layout { display:grid; grid-template-columns:340px 1fr; gap:14px; padding:0 32px 32px; height:calc(100vh - 110px); }
+    @media (max-width: 1100px) { .layout { grid-template-columns:1fr; height:auto; } #map { height:60vh; } }
+
+    .side {
+      background:#fff; border-radius:10px; padding:14px;
+      box-shadow:0 1px 4px rgba(0,0,0,.08);
+      overflow:auto;
+    }
+    .side h3 { font-size:0.95rem; margin-bottom:10px; color:#1a1a2e; }
+    .src-card {
+      background:#fff8ec; border:1px solid #ffe5b0; border-radius:8px;
+      padding:10px 12px; margin-bottom:10px; cursor:pointer;
+    }
+    .src-card:hover { border-color:#f7914f; box-shadow:0 1px 4px rgba(247,145,79,.2); }
+    .src-card.active { border-color:#f7914f; background:#fff0d6; }
+    .src-card h4 { font-size:0.85rem; font-weight:700; color:#a05a00; }
+    .src-card .meta { font-size:0.75rem; color:#666; margin-top:4px; line-height:1.5; }
+    .src-card .stat { display:inline-block; padding:2px 7px; border-radius:5px; font-size:0.72rem; margin-top:6px; margin-right:4px; }
+    .stat-int { background:#dff5e3; color:#1a7a4a; font-weight:600; }
+    .stat-zero { background:#fdecec; color:#c44; }
+
+    .int-list { margin-top:8px; padding-top:8px; border-top:1px solid #eed; }
+    .int-row { font-size:0.74rem; padding:5px 0; border-bottom:1px dashed #f0e8d0; line-height:1.5; }
+    .int-row:last-child { border-bottom:none; }
+    .int-row b { color:#4f6ef7; }
+
+    #map { background:#e0e6ed; border-radius:10px; box-shadow:0 1px 4px rgba(0,0,0,.08); }
+
+    .legend {
+      background:#fff; padding:8px 12px; border-radius:6px;
+      box-shadow:0 1px 4px rgba(0,0,0,.15);
+      font-size:0.78rem; line-height:1.7;
+    }
+    .legend i { display:inline-block; width:14px; height:14px; margin-right:6px; vertical-align:middle; border:2px solid; }
+
+    .loading { text-align:center; padding:40px; color:#aaa; }
+
+    .controls {
+      display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap;
+    }
+    .controls button {
+      padding:6px 12px; background:#fff; border:1px solid #ddd;
+      border-radius:6px; cursor:pointer; font-size:0.82rem;
+    }
+    .controls button:hover { background:#eef0ff; border-color:#4f6ef7; }
+    .controls button.active { background:#4f6ef7; color:#fff; border-color:#4f6ef7; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="brand">AgriLandTin</div>
+  <nav>
+    <a href="/">Bosh sahifa</a>
+    <a href="/land-category.html">Land Category</a>
+    <a href="/cross-matrix.html">Cross Matrix</a>
+    <a href="/six-shapes.html">6-shakl</a>
+    <a href="/hokimyat-mat.html">Hokimyat Mat</a>
+    <a href="/katta-tashkilotlar.html">Katta Tashkilotlar</a>
+    <a href="/tin-soato-pairs.html">TIN-SOATO</a>
+    <a href="/qungirot.html">Qo'ng'irot</a>
+    <a href="/qungirot-intersect.html" class="active">Kesishuvlar</a>
+  </nav>
+</header>
+
+<div class="page-title">
+  <h1>Qo'ng'irot — all.json va agri_land_full kesishuvlari</h1>
+  <div class="sub">tuman_code = 1735215 · tin = 203316341 · all.json poligonlari bilan $geoIntersects</div>
+</div>
+
+<div class="layout">
+  <div class="side" id="side"><div class="loading">Yuklanmoqda...</div></div>
+  <div id="map"></div>
+</div>
+
+<script>
+const map = L.map('map').setView([42.5, 59.5], 9);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© OpenStreetMap',
+  maxZoom: 19,
+}).addTo(map);
+
+// Legend
+const legend = L.control({ position: 'bottomright' });
+legend.onAdd = () => {
+  const div = L.DomUtil.create('div', 'legend');
+  div.innerHTML = `
+    <i style="background:#f7914f55;border-color:#f7914f"></i> all.json (asl)<br>
+    <i style="background:#4f6ef755;border-color:#4f6ef7"></i> agri_land_full kesishgan<br>
+    <i style="background:#2a9d3f55;border-color:#2a9d3f"></i> Tanlangan
+  `;
+  return div;
+};
+legend.addTo(map);
+
+const fmt   = n => Number(n || 0).toLocaleString('uz-UZ', { maximumFractionDigits: 2 });
+const fmtI  = n => Number(n || 0).toLocaleString('uz-UZ');
+const safe  = v => v == null || v === '' ? '—' : String(v);
+
+let allBounds = null;
+let sourceLayers = [];
+let intersectLayers = [];
+
+(async () => {
+  const r = await fetch('/api/agri-land-tins/qungirot-all-json');
+  const data = await r.json();
+  const side = document.getElementById('side');
+
+  if (!data.results || !data.results.length) {
+    side.innerHTML = '<div class="loading">Ma\'lumot topilmadi</div>';
+    return;
+  }
+
+  // Side panel
+  let html = `<div style="font-size:0.82rem;color:#666;margin-bottom:10px">
+    Manba: <b>${data.total_source}</b> ta polygon · TIN: <b>${data.tin}</b> · Tuman: <b>${data.tuman}</b>
+  </div>`;
+
+  html += `<div class="controls">
+    <button onclick="toggleLayer('source', this)" class="active">all.json</button>
+    <button onclick="toggleLayer('intersect', this)" class="active">Kesishganlar</button>
+    <button onclick="fitAll()">Hammasini ko'rsat</button>
+  </div>`;
+
+  data.results.forEach((r, i) => {
+    const intCount = r.intersections.length;
+    html += `<div class="src-card" id="src-${i}" onclick="focusSource(${i})">
+      <h4>${safe(r.cad_num)}</h4>
+      <div class="meta">
+        ${safe(r.address)}<br>
+        Mahalla: ${safe(r.neighborhood)} · Maydon: ${fmt(r.area)}<br>
+        ${(r.subjects || []).map(s => s.name).join(', ')}
+      </div>
+      <span class="stat ${intCount ? 'stat-int' : 'stat-zero'}">${intCount} ta kesishuv</span>
+      ${intCount ? `<div class="int-list">${r.intersections.map(it => `
+        <div class="int-row">
+          <b>${safe(it.cadastral_number)}</b> ·
+          ${fmt(it.gis_area_ha)} ga ·
+          ${safe(it.land_fund_type)}<br>
+          <span style="color:#888;font-size:0.7rem">${safe(it.land_fund_type_description)}</span>
+        </div>`).join('')}</div>` : ''}
+    </div>`;
+  });
+  side.innerHTML = html;
+
+  // Render layers
+  data.results.forEach((r, i) => {
+    // all.json source polygon
+    if (r.geometry) {
+      try {
+        const layer = L.geoJSON(r.geometry, {
+          style: { color: '#f7914f', weight: 2, fillColor: '#f7914f', fillOpacity: 0.18 },
+        }).bindPopup(`<b>all.json</b><br>${safe(r.cad_num)}<br>${safe(r.address)}`);
+        layer._srcIdx = i;
+        layer.addTo(map);
+        sourceLayers.push(layer);
+      } catch(e) { console.error('source geom error', e); }
+    }
+
+    // Intersection polygons
+    r.intersections.forEach(it => {
+      if (!it.geom_g) return;
+      try {
+        const layer = L.geoJSON(it.geom_g, {
+          style: { color: '#4f6ef7', weight: 1.5, fillColor: '#4f6ef7', fillOpacity: 0.25 },
+        }).bindPopup(`
+          <b>agri_land_full</b><br>
+          Kadastr: <b>${safe(it.cadastral_number)}</b><br>
+          Maydon: ${fmt(it.gis_area_ha)} ga<br>
+          Type: ${safe(it.land_fund_type)}<br>
+          ${safe(it.land_fund_type_description)}<br>
+          Mahalla: ${safe(it.mahalla_name)}<br>
+          Active: ${it.is_active ? 'Ha' : 'Yo\'q'} · Removed: ${it.removed_by_qx ? 'Ha' : 'Yo\'q'}
+        `);
+        layer._srcIdx = i;
+        layer.addTo(map);
+        intersectLayers.push(layer);
+      } catch(e) { console.error('intersect geom error', e); }
+    });
+  });
+
+  fitAll();
+})();
+
+function fitAll() {
+  const all = [...sourceLayers, ...intersectLayers];
+  if (!all.length) return;
+  const group = L.featureGroup(all);
+  map.fitBounds(group.getBounds(), { padding: [20, 20] });
+}
+
+function focusSource(i) {
+  document.querySelectorAll('.src-card').forEach(c => c.classList.remove('active'));
+  document.getElementById(`src-${i}`).classList.add('active');
+
+  // Reset all colors
+  sourceLayers.forEach(l => l.setStyle({ color: '#f7914f', fillColor: '#f7914f', fillOpacity: 0.18 }));
+  intersectLayers.forEach(l => l.setStyle({ color: '#4f6ef7', fillColor: '#4f6ef7', fillOpacity: 0.25 }));
+
+  // Highlight matching
+  const matching = [
+    ...sourceLayers.filter(l => l._srcIdx === i),
+    ...intersectLayers.filter(l => l._srcIdx === i),
+  ];
+  matching.forEach(l => l.setStyle({ color: '#2a9d3f', fillColor: '#2a9d3f', fillOpacity: 0.35, weight: 3 }));
+
+  if (matching.length) {
+    const group = L.featureGroup(matching);
+    map.fitBounds(group.getBounds(), { padding: [40, 40] });
+  }
+}
+
+function toggleLayer(type, btn) {
+  const isOn = btn.classList.toggle('active');
+  const layers = type === 'source' ? sourceLayers : intersectLayers;
+  layers.forEach(l => {
+    if (isOn) l.addTo(map);
+    else map.removeLayer(l);
+  });
+}
+</script>
+</body>
+</html>

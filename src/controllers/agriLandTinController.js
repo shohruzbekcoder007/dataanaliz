@@ -371,6 +371,89 @@ exports.qungirotAnalysis = async (req, res) => {
   });
 };
 
+// EPSG:3857 (Web Mercator) → EPSG:4326 (WGS84) reproject
+function mercToWgs84([x, y]) {
+  const R = 6378137;
+  const lon = (x / R) * (180 / Math.PI);
+  const lat = (Math.atan(Math.exp(y / R)) * 2 - Math.PI / 2) * (180 / Math.PI);
+  return [lon, lat];
+}
+
+function reprojectGeom(geom) {
+  if (!geom || !geom.coordinates) return geom;
+  const crsName = geom.crs?.properties?.name || '';
+  const isMerc = /3857/.test(crsName);
+  if (!isMerc) {
+    // Strip crs field anyway (Mongo doesn't like named CRS)
+    const { crs, ...rest } = geom;
+    return rest;
+  }
+
+  const reproject = (coords) => {
+    if (typeof coords[0] === 'number') return mercToWgs84(coords);
+    return coords.map(reproject);
+  };
+
+  return {
+    type: geom.type,
+    coordinates: reproject(geom.coordinates),
+  };
+}
+
+// All.json bilan agri_land_full ni $geoIntersects qilib chiqarish
+exports.qungirotAllJsonIntersect = async (req, res) => {
+  const fs = require('fs');
+  const path = require('path');
+  const TUMAN = '1735215';
+  const TIN = '203316341';
+
+  const filePath = path.join(__dirname, '..', '..', 'all.json');
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ error: 'all.json topilmadi' });
+  }
+  const all = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+
+  const db = require('mongoose').connection.db;
+  const col = db.collection('agri_land_full');
+
+  const results = [];
+  for (const entry of all) {
+    const rawGeom = entry?.data?.response?.geometry;
+    if (!rawGeom) continue;
+    const geom = reprojectGeom(rawGeom);
+
+    const intersections = await col.find({
+      tuman_code: TUMAN,
+      tin: TIN,
+      geom_g: { $geoIntersects: { $geometry: geom } },
+    }).project({
+      cadastral_number: 1, tin: 1, owner_full_name: 1,
+      land_fund_category: 1, land_fund_type: 1, land_fund_type_description: 1,
+      property_kind: 1, gis_area_ha: 1, mahalla_name: 1,
+      is_active: 1, removed_by_qx: 1, geom_g: 1,
+    }).toArray();
+
+    results.push({
+      source: entry.source,
+      cad_num: entry.cad_num,
+      area: entry?.data?.response?.area,
+      land_area: entry?.data?.response?.land_area,
+      address: entry?.data?.response?.address,
+      neighborhood: entry?.data?.response?.neighborhood,
+      subjects: entry?.data?.response?.subjects,
+      geometry: geom,
+      intersections,
+    });
+  }
+
+  res.json({
+    tuman: TUMAN,
+    tin: TIN,
+    total_source: results.length,
+    results,
+  });
+};
+
 // Qo'ng'irot kadastrlar ro'yxati (filterli/filtersiz) — TIN 201039878 birinchi
 exports.qungirotCadastrals = async (req, res) => {
   const TUMAN = '1735215';

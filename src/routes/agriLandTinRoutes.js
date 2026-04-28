@@ -59,6 +59,9 @@ router.get('/tin-deep/:tin',        ctrl.tinDeepAnalysis);
 router.get('/qungirot-cadastrals',  ctrl.qungirotCadastrals);
 router.get('/qungirot-cadastrals/compare', ctrl.qungirotCadastralsCompare);
 
+// all.json bilan kesishuvni topish
+router.get('/qungirot-all-json',    ctrl.qungirotAllJsonIntersect);
+
 // Qidiruv — tin bo'yicha
 router.get('/tin/:tin',             ctrl.getByTin);
 
