@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node update_tin_from_xlsx.js)",
+      "Bash(node -e ' *)"
+    ]
+  }
+}
